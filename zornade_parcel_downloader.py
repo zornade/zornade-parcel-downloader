@@ -1,183 +1,64 @@
 """
-***************************************************************************
-*                                                                         *
-*   This program is free software; you can redistribute it and/or modify  *
-*   it under the terms of the GNU General Public License as published by  *
-*   the Free Software Foundation; either version 2 of the License, or     *
-*   (at your option) any later version.                                   *
-*                                                                         *
-***************************************************************************
+Zornade — Plugin QGIS per Particelle Catastali Arricchite.
+
+Plugin class principale: gestisce toolbar, menu e apertura del dialog.
+Usa le API v2 gratuite di Zornade (https://zornade.com).
 """
 
 import os
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
+
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.core import QgsApplication
-
-from .parcel_downloader_provider import ParcelDownloaderProvider
 
 
 class ZornadeParcelDownloader:
-    """QGIS Plugin Implementation for Zornade Italian Parcel Downloader."""
+    """Plugin QGIS per particelle catastali arricchite via Zornade API v2."""
 
     def __init__(self, iface):
-        """Constructor.
-
-        :param iface: An interface instance that will be passed to this class
-            which provides the hook by which you can manipulate the QGIS
-            application at run time.
-        :type iface: QgsInterface
-        """
-        # Save reference to the QGIS interface
         self.iface = iface
-        # initialize plugin directory
         self.plugin_dir = os.path.dirname(__file__)
-        # initialize locale
-        locale = QSettings().value('locale/userLocale')[0:2]
-        locale_path = os.path.join(
-            self.plugin_dir,
-            'i18n',
-            'ZornadeParcelDownloader_{}.qm'.format(locale))
-
-        if os.path.exists(locale_path):
-            self.translator = QTranslator()
-            self.translator.load(locale_path)
-            QCoreApplication.installTranslator(self.translator)
-
-        # Declare instance attributes
         self.actions = []
-        self.menu = self.tr(u'&Zornade Italian Parcel Downloader')
+        self.menu = "&Zornade"
+        self.dialog = None
 
-        # Initialize processing provider
-        self.provider = None
-
-    def tr(self, message):
-        """Get the translation for a string using Qt translation API.
-
-        We implement this ourselves since we do not inherit QObject.
-
-        :param message: String for translation.
-        :type message: str, QString
-
-        :returns: Translated version of message.
-        :rtype: QString
-        """
-        return QCoreApplication.translate('ZornadeParcelDownloader', message)
-
-    def add_action(
-        self,
-        icon_path,
-        text,
-        callback,
-        enabled_flag=True,
-        add_to_menu=True,
-        add_to_toolbar=True,
-        status_tip=None,
-        whats_this=None,
-        parent=None):
-        """Add a toolbar icon to the toolbar."""
-
-        icon = QIcon(icon_path)
-        action = QAction(icon, text, parent)
-        action.triggered.connect(callback)
-        action.setEnabled(enabled_flag)
-
-        if status_tip is not None:
-            action.setStatusTip(status_tip)
-
-        if whats_this is not None:
-            action.setWhatsThis(whats_this)
-
-        if add_to_toolbar:
-            # Adds plugin icon to Plugins toolbar
-            self.iface.addToolBarIcon(action)
-
-        if add_to_menu:
-            self.iface.addPluginToWebMenu(
-                self.menu,
-                action)
-
-        self.actions.append(action)
-
-        return action
+    @staticmethod
+    def tr(message):
+        return QCoreApplication.translate("ZornadeParcelDownloader", message)
 
     def initGui(self):
-        """Create the menu entries and toolbar icons inside the QGIS GUI."""
-
-        icon_path = os.path.join(self.plugin_dir, 'icon.png')
-        self.add_action(
-            icon_path,
-            text=self.tr(u'Download Italian Parcels'),
-            callback=self.run,
-            status_tip=self.tr(u'Download Italian cadastral parcels from Zornade'),
-            whats_this=self.tr(u'Download enriched Italian cadastral parcel data from Zornade\'s comprehensive dataset'),
-            parent=self.iface.mainWindow())
-
-        # Initialize processing provider
-        self.initProcessing()
-
-    def initProcessing(self):
-        """Create the Processing provider"""
-        self.provider = ParcelDownloaderProvider()
-        QgsApplication.processingRegistry().addProvider(self.provider)
+        icon_path = os.path.join(self.plugin_dir, "icon.png")
+        icon = QIcon(icon_path)
+        action = QAction(
+            icon,
+            self.tr("Zornade — Particelle Catastali"),
+            self.iface.mainWindow(),
+        )
+        action.setStatusTip(
+            self.tr("Scarica particelle catastali arricchite"))
+        action.setWhatsThis(
+            self.tr(
+                "Scarica particelle catastali italiane arricchite "
+                "con dati geografici, demografici, economici e di rischio "
+                "tramite le API v2 gratuite di Zornade."))
+        action.triggered.connect(self.run)
+        self.iface.addToolBarIcon(action)
+        self.iface.addPluginToWebMenu(self.menu, action)
+        self.actions.append(action)
 
     def unload(self):
-        """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
-            self.iface.removePluginWebMenu(
-                self.tr(u'&Zornade Italian Parcel Downloader'),
-                action)
+            self.iface.removePluginWebMenu(self.menu, action)
             self.iface.removeToolBarIcon(action)
-
-        # Remove processing provider
-        if self.provider:
-            QgsApplication.processingRegistry().removeProvider(self.provider)
+        if self.dialog:
+            self.dialog.close()
+            self.dialog = None
 
     def run(self):
-        """Run method that opens the Processing algorithm."""
-        from qgis import processing
-        
-        try:
-            processing.execAlgorithmDialog('zornadeapi:ZornadeParcelDownloader')
-        except Exception as e:
-            # Fallback: try to open processing toolbox via menu
-            try:
-                from qgis.utils import iface
-                from qgis.PyQt.QtWidgets import QApplication
-                
-                # Try to find and trigger the processing menu action
-                main_window = iface.mainWindow()
-                menubar = main_window.menuBar()
-                
-                # Look for Processing menu
-                for action in menubar.actions():
-                    if 'processing' in action.text().lower() or 'toolbox' in action.text().lower():
-                        # Find the toolbox action in the submenu
-                        if action.menu():
-                            for sub_action in action.menu().actions():
-                                if 'toolbox' in sub_action.text().lower():
-                                    sub_action.trigger()
-                                    return
-                        break
-                
-                # If menu approach fails, show a message
-                from qgis.PyQt.QtWidgets import QMessageBox
-                QMessageBox.information(
-                    iface.mainWindow(),
-                    "Zornade Italian Parcel Downloader",
-                    "Please open the Processing Toolbox manually:\n"
-                    "Processing → Toolbox\n\n"
-                    "Then navigate to: Zornade API → Zornade Parcel Downloader"
-                )
-                
-            except Exception as e2:
-                # Final fallback message
-                from qgis.PyQt.QtWidgets import QMessageBox
-                QMessageBox.information(
-                    iface.mainWindow(),
-                    "Zornade Italian Parcel Downloader",
-                    "Please open the Processing Toolbox manually:\n"
-                    "Processing → Toolbox\n\n"
-                    "Then navigate to: Zornade API → Zornade Parcel Downloader"
-                )
+        from .zornade_dialog import ZornadeDialog
+
+        if self.dialog is None or not self.dialog.isVisible():
+            self.dialog = ZornadeDialog(self.iface)
+        self.dialog.show()
+        self.dialog.raise_()
+        self.dialog.activateWindow()

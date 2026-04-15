@@ -1,48 +1,67 @@
 [general]
-name=Zornade Italian Parcel Downloader
-qgisMinimumVersion=3.16
-qgisMaximumVersion=3.99
-description=Download enriched Italian cadastral parcel data from Zornade's comprehensive dataset via RapidAPI
-version=1.0.0
+name=Zornade Particelle Catastali
+qgisMinimumVersion=3.28
+qgisMaximumVersion=4.99
+description=Download enriched Italian cadastral parcels with land cover, risk, subsidence, valuation and cadastral data via the free Zornade API v2.
+version=2.2.1
 author=Zornade
 email=e.pascatti@gmail.com
 
-about=Professional QGIS plugin for downloading enriched Italian cadastral parcel data from Zornade's comprehensive dataset via RapidAPI. Access detailed cadastral information including accurate geometries, administrative data, risk assessments (flood, landslide, seismic), land cover classification, demographic statistics, and elevation data. Features include: intelligent batch processing with adaptive sizing, robust error handling and recovery, secure credential management, automatic coordinate transformation, comprehensive progress reporting, and seamless QGIS Processing Framework integration. Designed for professionals in real estate, urban planning, environmental analysis, and GIS applications requiring accurate Italian cadastral data.
+about=Professional QGIS plugin to download enriched Italian cadastral parcels via the free Zornade API v2 (100%% free, 1,000 req/hour). Search by GPS coordinates, map canvas bounding box (adaptive quadtree subdivision), or cadastral reference (Belfiore municipality code, sheet, parcel). Each parcel includes 35 attribute fields: accurate geometry (Polygon/MultiPolygon), CORINE land cover classification, seismic zone (1–4), PGA, flood and landslide level, subsidence analysis (velocity, risk class, direction), OMI real estate valuation (purchase and rental ranges), cadastral data (foglio, sezione urbana, CAP). Sketching: categorized renderer for CORINE land cover (5 Level-1 classes), seismic zone (4 classes), and subsidence risk (5 classes). Scale-dependent labeling. Native Qt6 interface with geocoding, map picking, async download via QgsTask with retry logic. Free API tokens at app.zornade.com.
 
 tracker=https://github.com/menimenocchio/zornade-parcel-downloader/issues
 repository=https://github.com/menimenocchio/zornade-parcel-downloader
 homepage=https://zornade.com
 
-# Recommended items:
-hasProcessingProvider=yes
-changelog=1.0.0 - Production release
-    - Professional-grade error handling and recovery
-    - Adaptive batch processing (10-25 parcels per batch based on dataset size)
-    - Intelligent rate limiting and API respect
-    - Comprehensive progress reporting and user feedback
-    - Robust geometry processing supporting Polygon and MultiPolygon formats
-    - Safe data type conversion and validation
-    - Secure credential storage with encryption
-    - Performance optimization for large datasets
-    - User-friendly error messages and troubleshooting guidance
-    - Production-ready stability and reliability improvements
+hasProcessingProvider=no
+changelog=2.2.1 - Fix: attribute type coercion for reliable feature insertion
+    - Explicit type casting (int/float/str) before setAttribute to prevent type mismatch rejections
+    - Per-feature fallback with error logging when batch addFeatures fails
+    2.2.0 - Fix: empty layer after download (reserved field name conflict)
+    - Renamed field "fid" to "parcel_id" to avoid conflict with QGIS memory provider internal field
+    - Fixed critical bug: addFeatures silently failed for all or some features
+    - Restored batch addFeatures (removed temporary per-feature diagnostics)
+    - Updated sketching label expression with new field name
+    2.1.0 - Complete data model rewrite, CORINE sketching, subsidence & valuation
+    - 35 attribute fields mapped from API v2 response (was 15, mostly null)
+    - CORINE Land Cover Level 1 categorized renderer (5 Italian classes)
+    - Seismic zone renderer (zones 1–4, graduated color scale)
+    - Subsidence risk renderer (classes 1–5, graduated color scale)
+    - OMI real estate valuation: purchase and rental price ranges (€/m²)
+    - Subsidence analysis: velocity (mm/year), risk class, direction
+    - Cadastral fields: foglio, sezione urbana, CAP, indirizzo
+    - Adaptive quadtree bbox search (subdivides tiles at API cap, no 200-parcel limit)
+    - Robust GeoJSON parsing via OGR (handles all geometry types)
+    - Download retry logic (3 attempts with exponential backoff on 5xx errors)
+    - Clean error messages for server errors (no raw HTML dumps)
+    - Default max results raised to 500
+    - Scale-dependent labels: "label — F.foglio" format
+    - Removed all deprecated v1 field references
+    - Full import cleanup and code audit
+    2.0.1 - Multi-point bbox search, QgsTask, English metadata
+    - Map canvas bbox search (3x3 grid, deduplicated results)
+    - Background download via QgsTask (QGIS best practice)
+    - QgsMessageLog for all plugin logging
+    - English description and about
+    2.0.0 - Complete rewrite for API v2
+    - Native Qt6 interface
+    - Free API v2 (no RapidAPI required)
+    - Search by coordinates, map canvas bbox, cadastral reference
+    - Map picking: select point directly from the map
+    - Categorized sketching with Zornade classification and risk colors
+    - Async download with progress bar via QgsTask
+    - Secure token management with in-app verification
+    - Scale-dependent labeling with expressions
+    - Polygon and MultiPolygon GeoJSON support
+    1.0.0 - Initial release (deprecated)
 
-# Tags are comma separated with spaces allowed
-tags=italy,cadastral,parcel,property,api,rapidapi,zornade,processing,data,download,geometry,real estate,land use,risk assessment,professional,gis
+tags=italy,cadastral,parcel,particella,catasto,api,zornade,data,download,geometry,real estate,land use,risk,rischio,gis,geocoding,free
 
 category=Web
 icon=icon.png
 experimental=False
 deprecated=False
 
-# Plugin supports QGIS Server
 server=False
-
-# Plugin license
 license=GPL-2.0-or-later
-
-# External dependencies
-external_deps=requests
-
-# Plugin classification
 plugin_type=professional
