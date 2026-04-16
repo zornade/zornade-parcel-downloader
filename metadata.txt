@@ -2,19 +2,40 @@
 name=Zornade Particelle Catastali
 qgisMinimumVersion=3.28
 qgisMaximumVersion=4.99
-description=Download enriched Italian cadastral parcels with land cover, risk, subsidence, valuation and cadastral data via the free Zornade API v2.
-version=2.2.1
+description=Download enriched Italian cadastral parcels with 90+ attribute fields including terrain, population, buildings, economics, demographics, land cover, land use, valuation, coastal erosion, cultural heritage and POI data via the free Zornade API v2.4.
+version=3.0.0
 author=Zornade
 email=e.pascatti@gmail.com
 
-about=Professional QGIS plugin to download enriched Italian cadastral parcels via the free Zornade API v2 (100%% free, 1,000 req/hour). Search by GPS coordinates, map canvas bounding box (adaptive quadtree subdivision), or cadastral reference (Belfiore municipality code, sheet, parcel). Each parcel includes 35 attribute fields: accurate geometry (Polygon/MultiPolygon), CORINE land cover classification, seismic zone (1–4), PGA, flood and landslide level, subsidence analysis (velocity, risk class, direction), OMI real estate valuation (purchase and rental ranges), cadastral data (foglio, sezione urbana, CAP). Sketching: categorized renderer for CORINE land cover (5 Level-1 classes), seismic zone (4 classes), and subsidence risk (5 classes). Scale-dependent labeling. Native Qt6 interface with geocoding, map picking, async download via QgsTask with retry logic. Free API tokens at app.zornade.com.
+about=Professional QGIS plugin to download enriched Italian cadastral parcels via the free Zornade API v2.4 (100%% free, 1,000 req/hour). Search by GPS coordinates, map canvas bounding box (adaptive quadtree subdivision), or cadastral reference (fuzzy municipality name, sheet, parcel, section). Each parcel includes 90+ attribute fields across 17 data sections: accurate geometry (Polygon/MultiPolygon), CORINE land cover classification, Urban Atlas land use, seismic zone (1–4), PGA, flood and landslide risk, subsidence analysis (velocity, acceleration, risk class, direction, trend), terrain (elevation, slope, aspect, ruggedness), population estimates (WorldPop/dasymetric), building footprints, economics (average income, Gini index, affordability PIR, income brackets), demographics (census 2021: age, education, employment, foreigners, households, dwellings), OMI real estate valuation (purchase and rental ranges with previous semester), coastal erosion, cultural heritage (MiBACT), Foursquare POI. Sketching: categorized renderer for CORINE land cover (5 Level-1 classes), seismic zone (4 classes), and subsidence risk (5 classes). Scale-dependent labeling. Default search by map canvas bbox. Native Qt6 interface with geocoding, map picking, async download via QgsTask with retry logic. Free API tokens at app.zornade.com.
 
 tracker=https://github.com/menimenocchio/zornade-parcel-downloader/issues
 repository=https://github.com/menimenocchio/zornade-parcel-downloader
 homepage=https://zornade.com
 
 hasProcessingProvider=no
-changelog=2.2.1 - Fix: attribute type coercion for reliable feature insertion
+changelog=3.0.0 - Complete API v2.4 alignment: 90+ attribute fields, all 17 data sections
+    - CRITICAL FIX: added mandatory Authorization Bearer header for Supabase Edge Functions
+    - CRITICAL FIX: search endpoint now uses correct API v2.4 params (comune, foglio, label, sezione)
+    - CRITICAL FIX: parcel detail now sends include=all to receive all data sections
+    - NEW: terrain section (elevation min/max/mean/std, slope, ruggedness, TRI, aspect)
+    - NEW: population section (estimated, method, confidence, municipality total)
+    - NEW: buildings section (count, footprint, residential count/footprint)
+    - NEW: economics section (avg income, taxpayers, total income, net tax, Gini, PIR affordability, avg price/m²)
+    - NEW: demographics section (census pop, male/female, employed, foreigners, dwellings, vacant, households)
+    - NEW: land use section (Urban Atlas: code, class, level1, level2)
+    - NEW: coastal erosion section (dynamic, avg change m/year, distance)
+    - NEW: cultural heritage section (count, name, type from MiBACT)
+    - NEW: POI section (count, first name, categories from Foursquare)
+    - NEW: addresses section (count, first formatted address)
+    - IMPROVED: subsidence now includes all 7 fields (velocity, acceleration, risk_class, risk_label, risk_index, direction, trend)
+    - IMPROVED: valuation now includes fascia, condition, and entry count
+    - IMPROVED: cadastral search tab uses fuzzy municipality name (not Belfiore code) + sezione field
+    - IMPROVED: results table now shows Foglio column
+    - CHANGED: default search tab is now Vista Mappa (bbox) instead of Coordinate
+    - 90+ attribute fields mapped from API v2.4 response (was 35)
+    - User-Agent updated to ZornadeQGISPlugin/3.0
+    2.2.1 - Fix: attribute type coercion for reliable feature insertion
     - Explicit type casting (int/float/str) before setAttribute to prevent type mismatch rejections
     - Per-feature fallback with error logging when batch addFeatures fails
     2.2.0 - Fix: empty layer after download (reserved field name conflict)

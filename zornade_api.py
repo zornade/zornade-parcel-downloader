@@ -19,6 +19,13 @@ API_BASE_URL = (
     "/functions/v1/api-v2/api/v2"
 )
 
+SUPABASE_ANON_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1cHF3ZnFqZnB3cmFwZ25vZ2p2"
+    "Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3NTA0OTAsImV4cCI6MjA1ODMy"
+    "NjQ5MH0.1oNlHmxpMx3yy0vx6DM4Oqs_ZuZfOwAZ4X0LhmrmGZ8"
+)
+
 
 class ZornadeApiError(Exception):
     """Errore specifico dell'API Zornade."""
@@ -50,9 +57,10 @@ class ZornadeApiClient:
             url = f"{url}?{urllib.parse.urlencode(filtered)}"
 
         req = urllib.request.Request(url, method="GET")
+        req.add_header("Authorization", f"Bearer {SUPABASE_ANON_KEY}")
         req.add_header("x-api-key", self.token)
         req.add_header("Accept", "application/json")
-        req.add_header("User-Agent", "ZornadeQGISPlugin/2.0")
+        req.add_header("User-Agent", "ZornadeQGISPlugin/3.0")
 
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
@@ -113,29 +121,47 @@ class ZornadeApiClient:
             "bbox": bbox_str, "limit": min(limit, 200),
         })
 
-    def search_parcels(self, municipality: str,
-                       sheet: Optional[str] = None,
-                       parcel: Optional[str] = None,
+    def search_parcels(self, comune: str,
+                       foglio: Optional[str] = None,
+                       label: Optional[str] = None,
+                       sezione: Optional[str] = None,
                        limit: int = 20) -> Dict:
         """Cerca particelle per riferimento catastale.
 
         Endpoint: GET /parcels/search
         Scope: parcels:read
+
+        Parametri API v2.4:
+          comune   — nome comune (fuzzy, es. 'Roma')
+          foglio   — numero foglio catastale
+          label    — etichetta particella
+          sezione  — sezione amministrativa
         """
         return self._request("parcels/search", {
-            "municipality": municipality,
-            "sheet": sheet,
-            "parcel": parcel,
+            "comune": comune,
+            "foglio": foglio,
+            "label": label,
+            "sezione": sezione,
             "limit": limit,
         })
 
-    def get_parcel_detail(self, parcel_id) -> Dict:
+    def get_parcel_detail(self, parcel_id,
+                         include: str = "all") -> Dict:
         """Profilo arricchito di una singola particella.
 
         Endpoint: GET /parcels/{id}
         Scope: parcels:read
+
+        include: sezioni da includere, separate da virgola.
+                 Valori: basic, cadastral, address, addresses, risk,
+                 subsidence, terrain, population, buildings, economics,
+                 demographics, land_cover, land_use, valuation,
+                 coastal_erosion, cultural_heritage, poi.
+                 Oppure 'all' per tutte.
         """
-        return self._request(f"parcels/{parcel_id}")
+        return self._request(f"parcels/{parcel_id}", {
+            "include": include,
+        })
 
     # ------------------------------------------------------------------
     # Geocoding

@@ -154,7 +154,7 @@ class ZornadeDialog(QDialog):
         link_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         link_btn.setStyleSheet("color: #14b8a6; text-decoration: underline;")
         link_btn.clicked.connect(lambda: QDesktopServices.openUrl(
-            QUrl("https://app.zornade.com")))
+            QUrl("https://app.zornade.com/api?ref=qgis-plugin&utm_source=qgis-plugin&utm_medium=desktop")))
         token_header.addWidget(link_btn)
         root.addLayout(token_header)
 
@@ -195,6 +195,7 @@ class ZornadeDialog(QDialog):
         self.tabs.addTab(self._create_coords_tab(), "Coordinate")
         self.tabs.addTab(self._create_extent_tab(), "Vista Mappa")
         self.tabs.addTab(self._create_cadastral_tab(), "Catastale")
+        self.tabs.setCurrentIndex(1)  # Default: Vista Mappa (bbox)
         sg_lay.addWidget(self.tabs)
 
         search_row = QHBoxLayout()
@@ -229,16 +230,17 @@ class ZornadeDialog(QDialog):
         rg_lay.addLayout(toolbar_row)
 
         self.results_table = QTableWidget()
-        self.results_table.setColumnCount(5)
+        self.results_table.setColumnCount(6)
         self.results_table.setHorizontalHeaderLabels(
-            ["", "FID", "Comune", "Etichetta", "Area m\u00b2"])
+            ["", "FID", "Comune", "Foglio", "Etichetta", "Area m\u00b2"])
         hh = self.results_table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         self.results_table.setColumnWidth(0, 30)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         self.results_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows)
         self.results_table.setAlternatingRowColors(True)
@@ -373,20 +375,24 @@ class ZornadeDialog(QDialog):
         form.setSpacing(8)
         form.setContentsMargins(8, 12, 8, 8)
 
-        self.municipality_input = QLineEdit()
-        self.municipality_input.setPlaceholderText(
-            "es. H501 (codice Belfiore)")
-        form.addRow("Codice Comune*:", self.municipality_input)
+        self.comune_input = QLineEdit()
+        self.comune_input.setPlaceholderText(
+            "es. Roma, Milano, Napoli")
+        form.addRow("Comune*:", self.comune_input)
 
         self.sheet_input = QLineEdit()
-        self.sheet_input.setPlaceholderText("opzionale")
+        self.sheet_input.setPlaceholderText("opzionale, es. 481")
         form.addRow("Foglio:", self.sheet_input)
 
-        self.parcel_input = QLineEdit()
-        self.parcel_input.setPlaceholderText("opzionale")
-        form.addRow("Particella:", self.parcel_input)
+        self.parcel_label_input = QLineEdit()
+        self.parcel_label_input.setPlaceholderText("opzionale, es. A, 123")
+        form.addRow("Particella:", self.parcel_label_input)
 
-        info = QLabel("* Codice catastale (Belfiore) obbligatorio")
+        self.sezione_input = QLineEdit()
+        self.sezione_input.setPlaceholderText("opzionale, es. A")
+        form.addRow("Sezione:", self.sezione_input)
+
+        info = QLabel("* Nome comune (ricerca fuzzy)")
         info.setEnabled(False)
         form.addRow("", info)
 
@@ -562,16 +568,17 @@ class ZornadeDialog(QDialog):
                 resp = self._bbox_multi_search(extent, limit)
 
             elif tab_idx == 2:  # Cadastral
-                municipality = self.municipality_input.text().strip()
-                if not municipality:
+                comune = self.comune_input.text().strip()
+                if not comune:
                     QMessageBox.warning(
                         self, "Errore",
-                        "Il codice catastale del comune è obbligatorio.")
+                        "Il nome del comune è obbligatorio.")
                     return
-                sheet = self.sheet_input.text().strip() or None
-                parcel = self.parcel_input.text().strip() or None
+                foglio = self.sheet_input.text().strip() or None
+                label = self.parcel_label_input.text().strip() or None
+                sezione = self.sezione_input.text().strip() or None
                 resp = self._api.search_parcels(
-                    municipality, sheet, parcel, limit)
+                    comune, foglio, label, sezione, limit)
             else:
                 return
 
@@ -744,7 +751,7 @@ class ZornadeDialog(QDialog):
             self.results_table.setItem(
                 row, 1, QTableWidgetItem(str(fid)))
 
-            # Municipality (from locate/search: dict with name)
+            # Municipality (from locate: dict with name; from search: string)
             mun_raw = item.get("municipality")
             if isinstance(mun_raw, dict):
                 mun = mun_raw.get("name", "--")
@@ -753,16 +760,21 @@ class ZornadeDialog(QDialog):
             self.results_table.setItem(
                 row, 2, QTableWidgetItem(str(mun)))
 
+            # Foglio (from search response)
+            foglio = item.get("foglio") or "--"
+            self.results_table.setItem(
+                row, 3, QTableWidgetItem(str(foglio)))
+
             # Label (particella label from API v2)
             label = item.get("label") or item.get("cadastral_reference") or "--"
             self.results_table.setItem(
-                row, 3, QTableWidgetItem(str(label)))
+                row, 4, QTableWidgetItem(str(label)))
 
             # Area m2
             area = item.get("area_m2")
             area_str = f"{float(area):,.0f}" if area else "--"
             self.results_table.setItem(
-                row, 4, QTableWidgetItem(area_str))
+                row, 5, QTableWidgetItem(area_str))
 
         count = len(parsed)
         self.results_count.setText(
@@ -961,19 +973,11 @@ class ZornadeDialog(QDialog):
     def _flatten_parcel(self, data: dict) -> dict:
         """Appiattisce la struttura annidata dell'API v2 in un dict piatto.
 
-        Risposta API v2 /parcels/{id}:
-          fid, gml_id, label, cadastral_reference, area_m2,
-          centroid: {lat, lng},
-          geometry: {type, coordinates},
-          municipality: {code, name, province, region},
-          cadastral: {foglio, sezione_urbana, comune_code, postal_code},
-          risk: {seismic_zone, pga, flood_level, landslide_level},
-          subsidence: {velocity_mm_year, risk_class, risk_label, ...},
-          land_cover: {code, class, subclass, description, source},
-          valuation: [{zone, zone_description, property_type, ...}, ...],
-          address, land_use, coastal_erosion, cultural_heritage, poi
+        Mappa tutti i 17 sezioni della risposta API v2.4 /parcels/{id}
+        in attributi piatti per il layer QGIS.
         """
         flat = {}
+        sf = self._safe_float
 
         # -- Identifiers --
         flat["parcel_id"] = data.get("fid")
@@ -995,11 +999,11 @@ class ZornadeDialog(QDialog):
             flat["region"] = None
 
         # -- Area & centroid --
-        flat["area_m2"] = self._safe_float(data.get("area_m2"))
+        flat["area_m2"] = sf(data.get("area_m2"))
         centroid = data.get("centroid")
         if isinstance(centroid, dict):
-            flat["centroid_lat"] = self._safe_float(centroid.get("lat"))
-            flat["centroid_lng"] = self._safe_float(centroid.get("lng"))
+            flat["centroid_lat"] = sf(centroid.get("lat"))
+            flat["centroid_lng"] = sf(centroid.get("lng"))
         else:
             flat["centroid_lat"] = None
             flat["centroid_lng"] = None
@@ -1015,14 +1019,36 @@ class ZornadeDialog(QDialog):
             flat["sezione_urbana"] = None
             flat["postal_code"] = None
 
-        # -- Address --
-        flat["address"] = data.get("address")
+        # -- Address (primary) --
+        addr = data.get("address")
+        if isinstance(addr, dict):
+            street = addr.get("street", "")
+            number = addr.get("number", "")
+            flat["address"] = f"{street} {number}".strip() if street else None
+        else:
+            flat["address"] = str(addr) if addr else None
+
+        # -- Addresses (list → count + first formatted) --
+        addrs = data.get("addresses")
+        if isinstance(addrs, list):
+            flat["addresses_count"] = len(addrs)
+            if addrs:
+                a0 = addrs[0]
+                parts = [a0.get("street", ""), a0.get("number", ""),
+                         a0.get("exponent", "")]
+                flat["address_first"] = " ".join(
+                    p for p in parts if p).strip() or None
+            else:
+                flat["address_first"] = None
+        else:
+            flat["addresses_count"] = None
+            flat["address_first"] = None
 
         # -- Risk --
         risk = data.get("risk")
         if isinstance(risk, dict):
             flat["seismic_zone"] = risk.get("seismic_zone")
-            flat["pga"] = self._safe_float(risk.get("pga"))
+            flat["pga"] = sf(risk.get("pga"))
             flat["flood_level"] = risk.get("flood_level")
             flat["landslide_level"] = risk.get("landslide_level")
         else:
@@ -1031,66 +1057,225 @@ class ZornadeDialog(QDialog):
             flat["flood_level"] = None
             flat["landslide_level"] = None
 
-        # -- Subsidence --
+        # -- Subsidence (full) --
         sub = data.get("subsidence")
         if isinstance(sub, dict):
-            flat["subsidence_velocity"] = self._safe_float(
-                sub.get("velocity_mm_year"))
-            flat["subsidence_risk_class"] = sub.get("risk_class")
-            flat["subsidence_risk_label"] = sub.get("risk_label")
-            flat["subsidence_direction"] = sub.get("direction")
+            flat["sub_velocity"] = sf(sub.get("velocity_mm_year"))
+            flat["sub_acceleration"] = sf(sub.get("acceleration"))
+            flat["sub_risk_class"] = sub.get("risk_class")
+            flat["sub_risk_label"] = sub.get("risk_label")
+            flat["sub_risk_index"] = sf(sub.get("risk_index"))
+            flat["sub_direction"] = sub.get("direction")
+            flat["sub_trend"] = sub.get("trend")
         else:
-            flat["subsidence_velocity"] = None
-            flat["subsidence_risk_class"] = None
-            flat["subsidence_risk_label"] = None
-            flat["subsidence_direction"] = None
+            flat["sub_velocity"] = None
+            flat["sub_acceleration"] = None
+            flat["sub_risk_class"] = None
+            flat["sub_risk_label"] = None
+            flat["sub_risk_index"] = None
+            flat["sub_direction"] = None
+            flat["sub_trend"] = None
 
-        # -- Land cover --
+        # -- Terrain --
+        ter = data.get("terrain")
+        if isinstance(ter, dict):
+            flat["elev_min"] = sf(ter.get("elevation_min"))
+            flat["elev_max"] = sf(ter.get("elevation_max"))
+            flat["elev_mean"] = sf(ter.get("elevation_mean"))
+            flat["elev_std"] = sf(ter.get("elevation_std"))
+            flat["slope_mean"] = sf(ter.get("slope_mean"))
+            flat["slope_max"] = sf(ter.get("slope_max"))
+            flat["ruggedness"] = sf(ter.get("ruggedness_index"))
+            flat["tri_mean"] = sf(ter.get("tri_mean"))
+            flat["aspect"] = ter.get("aspect_predominant")
+        else:
+            flat["elev_min"] = None
+            flat["elev_max"] = None
+            flat["elev_mean"] = None
+            flat["elev_std"] = None
+            flat["slope_mean"] = None
+            flat["slope_max"] = None
+            flat["ruggedness"] = None
+            flat["tri_mean"] = None
+            flat["aspect"] = None
+
+        # -- Population --
+        pop = data.get("population")
+        if isinstance(pop, dict):
+            flat["pop_estimated"] = sf(pop.get("estimated"))
+            flat["pop_method"] = pop.get("estimation_method")
+            flat["pop_confidence"] = sf(pop.get("estimation_confidence"))
+            flat["pop_mun_total"] = sf(pop.get("municipality_total"))
+        else:
+            flat["pop_estimated"] = None
+            flat["pop_method"] = None
+            flat["pop_confidence"] = None
+            flat["pop_mun_total"] = None
+
+        # -- Buildings --
+        bld = data.get("buildings")
+        if isinstance(bld, dict):
+            flat["bld_count"] = bld.get("count")
+            flat["bld_footprint"] = sf(bld.get("footprint_m2"))
+            flat["bld_residential"] = bld.get("residential_count")
+            flat["bld_res_footprint"] = sf(
+                bld.get("residential_footprint_m2"))
+        else:
+            flat["bld_count"] = None
+            flat["bld_footprint"] = None
+            flat["bld_residential"] = None
+            flat["bld_res_footprint"] = None
+
+        # -- Economics --
+        eco = data.get("economics")
+        if isinstance(eco, dict):
+            flat["eco_avg_income"] = sf(eco.get("average_income"))
+            flat["eco_taxpayers"] = eco.get("taxpayers")
+            flat["eco_total_income"] = eco.get("total_income")
+            flat["eco_net_tax"] = eco.get("net_tax")
+            flat["eco_tax_year"] = eco.get("tax_year")
+            flat["eco_gini"] = sf(eco.get("gini_index"))
+            flat["eco_afford_idx"] = sf(eco.get("affordability_index"))
+            flat["eco_avg_price_m2"] = sf(
+                eco.get("avg_residential_price_m2"))
+        else:
+            flat["eco_avg_income"] = None
+            flat["eco_taxpayers"] = None
+            flat["eco_total_income"] = None
+            flat["eco_net_tax"] = None
+            flat["eco_tax_year"] = None
+            flat["eco_gini"] = None
+            flat["eco_afford_idx"] = None
+            flat["eco_avg_price_m2"] = None
+
+        # -- Demographics --
+        dem = data.get("demographics")
+        if isinstance(dem, dict):
+            flat["dem_pop_total"] = dem.get("population_total")
+            flat["dem_male"] = dem.get("male")
+            flat["dem_female"] = dem.get("female")
+            flat["dem_employed"] = dem.get("employed")
+            fgn = dem.get("foreigners")
+            if isinstance(fgn, dict):
+                flat["dem_foreigners"] = fgn.get("total")
+            else:
+                flat["dem_foreigners"] = None
+            dwell = dem.get("dwellings")
+            if isinstance(dwell, dict):
+                flat["dem_dwellings"] = dwell.get("total")
+                flat["dem_dwell_vacant"] = dwell.get("vacant")
+            else:
+                flat["dem_dwellings"] = None
+                flat["dem_dwell_vacant"] = None
+            hh = dem.get("households")
+            flat["dem_households"] = (
+                hh.get("total") if isinstance(hh, dict) else None)
+        else:
+            flat["dem_pop_total"] = None
+            flat["dem_male"] = None
+            flat["dem_female"] = None
+            flat["dem_employed"] = None
+            flat["dem_foreigners"] = None
+            flat["dem_dwellings"] = None
+            flat["dem_dwell_vacant"] = None
+            flat["dem_households"] = None
+
+        # -- Land cover (CORINE) --
         lc = data.get("land_cover")
         if isinstance(lc, dict):
-            flat["land_cover_code"] = lc.get("code")
-            flat["land_cover_class"] = lc.get("class")
-            flat["land_cover_subclass"] = lc.get("subclass")
-            flat["land_cover_desc"] = lc.get("description")
+            flat["lc_code"] = lc.get("code")
+            flat["lc_class"] = lc.get("class")
+            flat["lc_subclass"] = lc.get("subclass")
+            flat["lc_desc"] = lc.get("description")
         else:
-            flat["land_cover_code"] = None
-            flat["land_cover_class"] = None
-            flat["land_cover_subclass"] = None
-            flat["land_cover_desc"] = None
+            flat["lc_code"] = None
+            flat["lc_class"] = None
+            flat["lc_subclass"] = None
+            flat["lc_desc"] = None
 
-        # -- Valuation (first entry, typically residential) --
+        # -- Land use (Urban Atlas) --
+        lu = data.get("land_use")
+        if isinstance(lu, dict):
+            flat["lu_code"] = lu.get("code")
+            flat["lu_class"] = lu.get("class")
+            flat["lu_level1"] = lu.get("level1")
+            flat["lu_level2"] = lu.get("level2")
+        else:
+            flat["lu_code"] = None
+            flat["lu_class"] = None
+            flat["lu_level1"] = None
+            flat["lu_level2"] = None
+
+        # -- Valuation (OMI, first entry) --
         val_list = data.get("valuation")
         if isinstance(val_list, list) and val_list:
             v = val_list[0]
             flat["val_zone"] = v.get("zone")
             flat["val_zone_desc"] = v.get("zone_description")
-            flat["val_property_type"] = v.get("property_type")
+            flat["val_fascia"] = v.get("fascia")
+            flat["val_prop_type"] = v.get("property_type")
+            flat["val_condition"] = v.get("condition")
             purchase = v.get("purchase")
             if isinstance(purchase, dict):
-                flat["val_purchase_min"] = self._safe_float(
-                    purchase.get("min_eur_m2"))
-                flat["val_purchase_max"] = self._safe_float(
-                    purchase.get("max_eur_m2"))
+                flat["val_buy_min"] = sf(purchase.get("min_eur_m2"))
+                flat["val_buy_max"] = sf(purchase.get("max_eur_m2"))
             else:
-                flat["val_purchase_min"] = None
-                flat["val_purchase_max"] = None
+                flat["val_buy_min"] = None
+                flat["val_buy_max"] = None
             rental = v.get("rental")
             if isinstance(rental, dict):
-                flat["val_rental_min"] = self._safe_float(
-                    rental.get("min_eur_m2"))
-                flat["val_rental_max"] = self._safe_float(
-                    rental.get("max_eur_m2"))
+                flat["val_rent_min"] = sf(rental.get("min_eur_m2"))
+                flat["val_rent_max"] = sf(rental.get("max_eur_m2"))
             else:
-                flat["val_rental_min"] = None
-                flat["val_rental_max"] = None
+                flat["val_rent_min"] = None
+                flat["val_rent_max"] = None
+            flat["val_entries"] = len(val_list)
         else:
             flat["val_zone"] = None
             flat["val_zone_desc"] = None
-            flat["val_property_type"] = None
-            flat["val_purchase_min"] = None
-            flat["val_purchase_max"] = None
-            flat["val_rental_min"] = None
-            flat["val_rental_max"] = None
+            flat["val_fascia"] = None
+            flat["val_prop_type"] = None
+            flat["val_condition"] = None
+            flat["val_buy_min"] = None
+            flat["val_buy_max"] = None
+            flat["val_rent_min"] = None
+            flat["val_rent_max"] = None
+            flat["val_entries"] = 0
+
+        # -- Coastal erosion (nearest segment) --
+        ce = data.get("coastal_erosion")
+        if isinstance(ce, list) and ce:
+            c0 = ce[0]
+            flat["coast_dynamic"] = c0.get("dynamic")
+            flat["coast_change"] = sf(c0.get("avg_change_m_year"))
+            flat["coast_distance"] = sf(c0.get("distance_m"))
+        else:
+            flat["coast_dynamic"] = None
+            flat["coast_change"] = None
+            flat["coast_distance"] = None
+
+        # -- Cultural heritage (count + first name) --
+        ch = data.get("cultural_heritage")
+        if isinstance(ch, list):
+            flat["heritage_count"] = len(ch)
+            flat["heritage_name"] = ch[0].get("name") if ch else None
+            flat["heritage_type"] = ch[0].get("type") if ch else None
+        else:
+            flat["heritage_count"] = None
+            flat["heritage_name"] = None
+            flat["heritage_type"] = None
+
+        # -- POI (count + first name) --
+        poi = data.get("poi")
+        if isinstance(poi, list):
+            flat["poi_count"] = len(poi)
+            flat["poi_first"] = poi[0].get("name") if poi else None
+            flat["poi_categories"] = (
+                poi[0].get("categories") if poi else None)
+        else:
+            flat["poi_count"] = None
+            flat["poi_first"] = None
+            flat["poi_categories"] = None
 
         return flat
 
@@ -1124,30 +1309,94 @@ class ZornadeDialog(QDialog):
         ("foglio",              QVariant.String,   "Foglio"),
         ("sezione_urbana",      QVariant.String,   "Sezione Urbana"),
         ("postal_code",         QVariant.String,   "CAP"),
+        # Address
         ("address",             QVariant.String,   "Indirizzo"),
+        ("addresses_count",     QVariant.Int,      "N. Indirizzi"),
+        ("address_first",       QVariant.String,   "Indirizzo Princ."),
         # Risk
         ("seismic_zone",        QVariant.Int,      "Zona Sismica"),
-        ("pga",                 QVariant.Double,   "PGA"),
-        ("flood_level",         QVariant.String,   "Livello Alluvione"),
-        ("landslide_level",     QVariant.String,   "Livello Frana"),
+        ("pga",                 QVariant.Double,   "PGA (g)"),
+        ("flood_level",         QVariant.String,   "Rischio Alluvione"),
+        ("landslide_level",     QVariant.String,   "Rischio Frana"),
         # Subsidence
-        ("subsidence_velocity", QVariant.Double,   "Subsidenza (mm/a)"),
-        ("subsidence_risk_class", QVariant.Int,    "Classe Rischio Sub."),
-        ("subsidence_risk_label", QVariant.String, "Rischio Subsidenza"),
-        ("subsidence_direction", QVariant.String,  "Direzione Sub."),
-        # Land cover
-        ("land_cover_code",     QVariant.String,   "Cod. Uso Suolo"),
-        ("land_cover_class",    QVariant.String,   "Classe Uso Suolo"),
-        ("land_cover_subclass", QVariant.String,   "Sottoclasse Uso Suolo"),
-        ("land_cover_desc",     QVariant.String,   "Descr. Uso Suolo"),
-        # Valuation (first entry)
+        ("sub_velocity",        QVariant.Double,   "Subsidenza (mm/a)"),
+        ("sub_acceleration",    QVariant.Double,   "Accel. Sub. (mm/a\u00b2)"),
+        ("sub_risk_class",      QVariant.Int,      "Classe Rischio Sub."),
+        ("sub_risk_label",      QVariant.String,   "Rischio Subsidenza"),
+        ("sub_risk_index",      QVariant.Double,   "Indice Rischio Sub."),
+        ("sub_direction",       QVariant.String,   "Direzione Sub."),
+        ("sub_trend",           QVariant.String,   "Tendenza Sub."),
+        # Terrain
+        ("elev_min",            QVariant.Double,   "Quota Min (m)"),
+        ("elev_max",            QVariant.Double,   "Quota Max (m)"),
+        ("elev_mean",           QVariant.Double,   "Quota Media (m)"),
+        ("elev_std",            QVariant.Double,   "Quota DevStd (m)"),
+        ("slope_mean",          QVariant.Double,   "Pendenza Media (\u00b0)"),
+        ("slope_max",           QVariant.Double,   "Pendenza Max (\u00b0)"),
+        ("ruggedness",          QVariant.Double,   "Indice Rugosit\u00e0 (m)"),
+        ("tri_mean",            QVariant.Double,   "TRI Medio"),
+        ("aspect",              QVariant.String,   "Esposizione"),
+        # Population
+        ("pop_estimated",       QVariant.Double,   "Pop. Stimata"),
+        ("pop_method",          QVariant.String,   "Metodo Stima Pop."),
+        ("pop_confidence",      QVariant.Double,   "Confidenza Pop."),
+        ("pop_mun_total",       QVariant.Double,   "Pop. Comune"),
+        # Buildings
+        ("bld_count",           QVariant.Int,      "N. Edifici"),
+        ("bld_footprint",       QVariant.Double,   "Sup. Coperta (m\u00b2)"),
+        ("bld_residential",     QVariant.Int,      "Edifici Residenz."),
+        ("bld_res_footprint",   QVariant.Double,   "Sup. Cop. Resid. (m\u00b2)"),
+        # Economics
+        ("eco_avg_income",      QVariant.Double,   "Reddito Medio (\u20ac)"),
+        ("eco_taxpayers",       QVariant.Int,      "Contribuenti"),
+        ("eco_total_income",    QVariant.LongLong, "Reddito Totale (\u20ac)"),
+        ("eco_net_tax",         QVariant.LongLong, "Imposta Netta (\u20ac)"),
+        ("eco_tax_year",        QVariant.Int,      "Anno Imposta"),
+        ("eco_gini",            QVariant.Double,   "Indice Gini"),
+        ("eco_afford_idx",      QVariant.Double,   "PIR (Accessibilit\u00e0)"),
+        ("eco_avg_price_m2",    QVariant.Double,   "Prezzo Medio (\u20ac/m\u00b2)"),
+        # Demographics
+        ("dem_pop_total",       QVariant.Int,      "Pop. Censimento"),
+        ("dem_male",            QVariant.Int,      "Maschi"),
+        ("dem_female",          QVariant.Int,      "Femmine"),
+        ("dem_employed",        QVariant.Int,      "Occupati"),
+        ("dem_foreigners",      QVariant.Int,      "Stranieri"),
+        ("dem_dwellings",       QVariant.Int,      "Abitazioni"),
+        ("dem_dwell_vacant",    QVariant.Int,      "Abitaz. Vuote"),
+        ("dem_households",      QVariant.Int,      "Famiglie"),
+        # Land cover (CORINE)
+        ("lc_code",             QVariant.String,   "Cod. CORINE"),
+        ("lc_class",            QVariant.String,   "Classe CORINE"),
+        ("lc_subclass",         QVariant.String,   "Sottoclasse CORINE"),
+        ("lc_desc",             QVariant.String,   "Descr. CORINE"),
+        # Land use (Urban Atlas)
+        ("lu_code",             QVariant.String,   "Cod. Urban Atlas"),
+        ("lu_class",            QVariant.String,   "Classe Urban Atlas"),
+        ("lu_level1",           QVariant.String,   "UA Livello 1"),
+        ("lu_level2",           QVariant.String,   "UA Livello 2"),
+        # Valuation (OMI)
         ("val_zone",            QVariant.String,   "Zona OMI"),
         ("val_zone_desc",       QVariant.String,   "Descr. Zona OMI"),
-        ("val_property_type",   QVariant.String,   "Tipo Immobile"),
-        ("val_purchase_min",    QVariant.Double,   "Acquisto Min (\u20ac/m\u00b2)"),
-        ("val_purchase_max",    QVariant.Double,   "Acquisto Max (\u20ac/m\u00b2)"),
-        ("val_rental_min",      QVariant.Double,   "Affitto Min (\u20ac/m\u00b2)"),
-        ("val_rental_max",      QVariant.Double,   "Affitto Max (\u20ac/m\u00b2)"),
+        ("val_fascia",          QVariant.String,   "Fascia OMI"),
+        ("val_prop_type",       QVariant.String,   "Tipo Immobile"),
+        ("val_condition",       QVariant.String,   "Stato Conserv."),
+        ("val_buy_min",         QVariant.Double,   "Acquisto Min (\u20ac/m\u00b2)"),
+        ("val_buy_max",         QVariant.Double,   "Acquisto Max (\u20ac/m\u00b2)"),
+        ("val_rent_min",        QVariant.Double,   "Affitto Min (\u20ac/m\u00b2)"),
+        ("val_rent_max",        QVariant.Double,   "Affitto Max (\u20ac/m\u00b2)"),
+        ("val_entries",         QVariant.Int,      "N. Quotazioni OMI"),
+        # Coastal erosion
+        ("coast_dynamic",       QVariant.String,   "Dinamica Costiera"),
+        ("coast_change",        QVariant.Double,   "Var. Costa (m/a)"),
+        ("coast_distance",      QVariant.Double,   "Dist. Costa (m)"),
+        # Cultural heritage
+        ("heritage_count",      QVariant.Int,      "N. Vincoli Culturali"),
+        ("heritage_name",       QVariant.String,   "Vincolo Culturale"),
+        ("heritage_type",       QVariant.String,   "Tipo Vincolo"),
+        # POI
+        ("poi_count",           QVariant.Int,      "N. Punti Interesse"),
+        ("poi_first",           QVariant.String,   "POI Principale"),
+        ("poi_categories",      QVariant.String,   "Categorie POI"),
     ]
 
     def _create_layer(self, results: list) -> Optional[QgsVectorLayer]:

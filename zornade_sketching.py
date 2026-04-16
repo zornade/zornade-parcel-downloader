@@ -102,7 +102,7 @@ def create_land_cover_renderer() -> QgsCategorizedSymbolRenderer:
         "", default_symbol, "Non classificato")
     categories.append(default_cat)
 
-    return QgsCategorizedSymbolRenderer("land_cover_class", categories)
+    return QgsCategorizedSymbolRenderer("lc_class", categories)
 
 
 def create_seismic_renderer() -> QgsCategorizedSymbolRenderer:
@@ -135,7 +135,7 @@ def create_subsidence_renderer() -> QgsCategorizedSymbolRenderer:
     categories.append(default_cat)
 
     return QgsCategorizedSymbolRenderer(
-        "subsidence_risk_class", categories)
+        "sub_risk_class", categories)
 
 
 # ======================================================================
