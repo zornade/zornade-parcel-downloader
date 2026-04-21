@@ -1,0 +1,14 @@
+# Python bytecode e cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Build artifacts — il .zip viene generato da create_plugin_zip.py o Makefile
+# NON tracciarlo nel repo: usa GitHub Releases per distribuirlo
+*.zip
+dist/
+
+# Editor
+*.swp
+.idea/
+.vscode/
