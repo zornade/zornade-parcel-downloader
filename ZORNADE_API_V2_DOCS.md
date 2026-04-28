@@ -1,8 +1,8 @@
 # Zornade API v2 — Documentazione Completa
 
 **Versione API:** 2.4.0  
-**Base URL:** `https://wupqwfqjfpwrapgnogjv.supabase.co/functions/v1/api-v2/api/v2`  
-**Ultimo aggiornamento:** 16 aprile 2026
+**Base URL:** `https://api.zornade.com/api/v2`  
+**Ultimo aggiornamento:** 28 aprile 2026
 
 ---
 
@@ -32,17 +32,11 @@
 
 ## 1. Autenticazione
 
-Tutti gli endpoint (tranne `/health`) richiedono due header:
+Tutti gli endpoint (tranne `/health`) richiedono un header:
 
 | Header | Valore | Descrizione |
 |---|---|---|
-| `Authorization` | `Bearer <SUPABASE_ANON_KEY>` | Chiave anonima Supabase (fissa, pubblica) |
 | `x-api-key` | `zrn_<64_hex_chars>` | Token API personale dell'utente |
-
-**Supabase Anon Key (fissa):**
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1cHF3ZnFqZnB3cmFwZ25vZ2p2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3NTA0OTAsImV4cCI6MjA1ODMyNjQ5MH0.1oNlHmxpMx3yy0vx6DM4Oqs_ZuZfOwAZ4X0LhmrmGZ8
-```
 
 **Token API:** ottenibile su [https://app.zornade.com/api](https://app.zornade.com/api). Ha formato `zrn_` seguito da 64 caratteri esadecimali.
 
@@ -56,9 +50,8 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1cHF3ZnF
 
 **Esempio richiesta:**
 ```bash
-curl -H "Authorization: Bearer eyJhbGci..." \
-     -H "x-api-key: zrn_bdc6a659..." \
-     "https://wupqwfqjfpwrapgnogjv.supabase.co/functions/v1/api-v2/api/v2/parcels/28009975"
+curl -H "x-api-key: zrn_bdc6a659..." \
+     "https://api.zornade.com/api/v2/parcels/28009975"
 ```
 
 **Protezione brute-force:** dopo 20 tentativi di autenticazione falliti dallo stesso IP in 15 minuti, l'IP viene bloccato per 15 minuti.
@@ -883,8 +876,7 @@ import json
 import urllib.request
 import urllib.parse
 
-BASE_URL = "https://wupqwfqjfpwrapgnogjv.supabase.co/functions/v1/api-v2/api/v2"
-ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1cHF3ZnFqZnB3cmFwZ25vZ2p2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3NTA0OTAsImV4cCI6MjA1ODMyNjQ5MH0.1oNlHmxpMx3yy0vx6DM4Oqs_ZuZfOwAZ4X0LhmrmGZ8"
+BASE_URL = "https://api.zornade.com/api/v2"
 API_KEY = "zrn_YOUR_API_KEY_HERE"
 
 
@@ -897,7 +889,6 @@ def api_get(endpoint, params=None):
         )
 
     req = urllib.request.Request(url, method="GET")
-    req.add_header("Authorization", f"Bearer {ANON_KEY}")
     req.add_header("x-api-key", API_KEY)
     req.add_header("Accept", "application/json")
     req.add_header("User-Agent", "ZornadeQGISPlugin/2.0")
@@ -948,28 +939,27 @@ result = api_get("admin/municipalities", {"province": "Roma"})
 
 ```bash
 # Variabili
-ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1cHF3ZnFqZnB3cmFwZ25vZ2p2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3NTA0OTAsImV4cCI6MjA1ODMyNjQ5MH0.1oNlHmxpMx3yy0vx6DM4Oqs_ZuZfOwAZ4X0LhmrmGZ8"
 KEY="zrn_YOUR_API_KEY"
-BASE="https://wupqwfqjfpwrapgnogjv.supabase.co/functions/v1/api-v2/api/v2"
+BASE="https://api.zornade.com/api/v2"
 
 # Dettaglio particella completo
-curl -H "Authorization: Bearer $ANON" -H "x-api-key: $KEY" \
+curl -H "x-api-key: $KEY" \
   "$BASE/parcels/28009975?include=all"
 
 # Solo rischio e economia
-curl -H "Authorization: Bearer $ANON" -H "x-api-key: $KEY" \
+curl -H "x-api-key: $KEY" \
   "$BASE/parcels/28009975?include=risk,economics"
 
 # Localizza da coordinate
-curl -H "Authorization: Bearer $ANON" -H "x-api-key: $KEY" \
+curl -H "x-api-key: $KEY" \
   "$BASE/parcels/locate?lat=41.9028&lng=12.4964&limit=1"
 
 # Ricerca catastale
-curl -H "Authorization: Bearer $ANON" -H "x-api-key: $KEY" \
+curl -H "x-api-key: $KEY" \
   "$BASE/parcels/search?comune=Roma&foglio=481&limit=5"
 
 # Geocoding
-curl -H "Authorization: Bearer $ANON" -H "x-api-key: $KEY" \
+curl -H "x-api-key: $KEY" \
   "$BASE/geocode/search?q=Via+del+Corso&city=Roma&limit=5"
 ```
 
@@ -977,7 +967,7 @@ curl -H "Authorization: Bearer $ANON" -H "x-api-key: $KEY" \
 
 ## Note per lo sviluppatore del plugin QGIS
 
-1. **Header `Authorization`:** è OBBLIGATORIO per tutte le chiamate API a Supabase Edge Functions. Va aggiunto a ogni richiesta insieme a `x-api-key`.
+1. **Autenticazione:** un solo header obbligatorio, `x-api-key`, con il token personale.
 
 2. **Geometria:** il campo `geometry` nella risposta è un oggetto GeoJSON standard (`Polygon`). In QGIS può essere convertito direttamente in `QgsGeometry` con `QgsGeometry.fromWkt(ogr.CreateGeometryFromJson(json.dumps(geom)).ExportToWkt())` o tramite `QgsJsonUtils`.
 

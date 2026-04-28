@@ -14,10 +14,7 @@ import urllib.error
 import urllib.parse
 from typing import Optional, Dict, Any, List
 
-API_BASE_URL = (
-    "https://wupqwfqjfpwrapgnogjv.supabase.co"
-    "/functions/v1/api-v2/api/v2"
-)
+API_BASE_URL = "https://api.zornade.com/api/v2"
 
 SUPABASE_ANON_KEY = (
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
