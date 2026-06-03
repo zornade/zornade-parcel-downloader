@@ -153,7 +153,7 @@ Restituisce il profilo arricchito completo di una particella catastale.
 
 | Parametro | Tipo | Default | Descrizione |
 |---|---|---|---|
-| `include` | stringa | `all` | Sezioni da includere, separate da virgola. Valori: `basic`, `cadastral`, `address`, `addresses`, `risk`, `subsidence`, `terrain`, `population`, `buildings`, `economics`, `demographics`, `land_cover`, `land_use`, `valuation`, `coastal_erosion`, `cultural_heritage`, `poi`. Oppure `all` per tutte. `basic` è sempre incluso. |
+| `include` | stringa | `all` | Sezioni da includere, separate da virgola. Valori: `basic`, `cadastral`, `address`, `addresses`, `risk`, `subsidence`, `terrain`, `population`, `buildings`, `economics`, `demographics`, `land_cover`, `land_use`, `valuation`, `valuation_history`, `coastal_erosion`, `cultural_heritage`, `poi`, `solar`, `nightlights`. Oppure `all` per tutte. `basic` è sempre incluso. |
 
 **Risposta completa (include=all):**
 
@@ -192,12 +192,15 @@ Restituisce il profilo arricchito completo di una particella catastale.
     "land_cover": { ... },
     "land_use": { ... },
     "valuation": [ ... ],
+    "valuation_history": { ... },
     "coastal_erosion": [ ... ],
     "cultural_heritage": [ ... ],
-    "poi": [ ... ]
+    "poi": [ ... ],
+    "solar": { ... },
+    "nightlights": { ... }
   },
   "meta": {
-    "sections_included": ["basic", "cadastral", "address", "addresses", "risk", "subsidence", "terrain", "population", "buildings", "economics", "demographics", "land_cover", "land_use", "valuation", "coastal_erosion", "cultural_heritage", "poi"]
+    "sections_included": ["basic", "cadastral", "address", "addresses", "risk", "subsidence", "terrain", "population", "buildings", "economics", "demographics", "land_cover", "land_use", "valuation", "valuation_history", "coastal_erosion", "cultural_heritage", "solar", "poi", "nightlights"]
   }
 }
 ```
@@ -820,6 +823,90 @@ Punti di interesse Foursquare (attivi, non chiusi) che intersecano la geometria 
 
 Array vuoto `[]` se nessun POI è presente nella particella.
 
+### 8.18 `solar`
+
+Potenziale fotovoltaico aggregato a livello di particella, calcolato sugli edifici presenti (modello JRC PVGIS-SARAH3 + metodologia Zornade v1.1).
+
+Se non sono disponibili dati solari per la particella, l'oggetto è `{ "available": false, "methodology_version": "v1.1" }`.
+
+Quando `available` è `true`:
+
+| Campo | Tipo | Descrizione |
+|---|---|---|
+| `available` | boolean | `true` se sono disponibili stime solari |
+| `n_buildings` | integer | Numero di edifici analizzati nella particella |
+| `kwp_max_total` | float | Potenza di picco massima installabile totale (kWp) |
+| `pvout_modern_kwh_year_total` | float | Produzione annua attesa con moduli moderni (kWh/anno) |
+| `pvout_pessimistic_kwh_year_total` | float | Produzione annua in scenario pessimistico (kWh/anno) |
+| `roof_pitch_avg_deg` | float | Inclinazione media delle falde (gradi) |
+| `roof_aspect_avg_deg` | float | Esposizione media delle falde (gradi, 180 = sud) |
+| `viability_class_max` | string | Classe di viabilità massima (es. `alta`, `media`, `bassa`) |
+| `capex_eur_total` | float | Investimento stimato totale (€) |
+| `npv_20y_eur_total` | float | Valore attuale netto a 20 anni (€) |
+| `payback_years_simple_avg` | float | Tempo di ritorno semplice medio (anni) |
+| `lcoe_eur_per_kwh_avg` | float | Costo livellato dell'energia medio (€/kWh) |
+| `data_version` | string | Versione del dataset (es. `pvgis:v5.3;sarah3:2025-10;model:v1.1`) |
+| `methodology_version` | string | Versione della metodologia (es. `v1.1`) |
+| `source` | string | Fonte (es. `JRC PVGIS-SARAH3 v5.3 + Zornade methodology v1.1`) |
+| `updated_at` | string | Timestamp ISO 8601 dell'ultimo aggiornamento |
+| `buildings` | array | Dettaglio per singolo edificio (vedi sotto) |
+
+Ogni elemento di `buildings` contiene: `building_fid`, `roof_shape`, `roof_pitch_deg`, `roof_aspect_deg`, `roof_area_real_m2`, `kwp_max`, `pvout_modern_kwh_year`, `capex_eur`, `npv_20y_eur`, `payback_years_simple`, `lcoe_eur_per_kwh`, `viability_class`, `confidence_level`, `exclusion_reason`, `bipv_eligible`.
+
+### 8.19 `nightlights`
+
+Luminosità notturna derivata dalle immagini satellitari VIIRS Black Marble (VNP46A4).
+
+Se non disponibile, l'oggetto è `{ "available": false }`.
+
+Quando `available` è `true`:
+
+| Campo | Tipo | Descrizione |
+|---|---|---|
+| `available` | boolean | `true` se sono disponibili dati di luminosità |
+| `ntl_parcel` | float | Radianza notturna stimata sulla particella |
+| `ntl_density` | float | Densità di radianza (per unità di superficie) |
+| `ntl_class` | string | Classe di luminosità: `dark`, `dim`, `medium`, `bright`, `very_bright` |
+| `ntl_share` | float | Quota della radianza comunale attribuita alla particella |
+| `ntl_mean_comune` | float | Radianza media del comune (riferimento) |
+| `estimation_method` | string | Metodo di stima: `dasymetric` o `uniform` |
+| `ntl_year` | integer | Anno dei dati (es. `2023`) |
+| `source` | string | Fonte (es. `viirs_vnp46a4_c2_2023`) |
+| `updated_at` | string | Timestamp ISO 8601 dell'ultimo aggiornamento |
+
+### 8.20 `valuation_history`
+
+Serie storica semestrale delle quotazioni immobiliari OMI (Osservatorio del Mercato Immobiliare) per la zona della particella. Tipo immobiliare di riferimento: `Abitazioni civili`, stato `NORMALE`.
+
+`null` se la particella non è arricchita con lo storico OMI.
+
+| Campo | Tipo | Descrizione |
+|---|---|---|
+| `zone_current` | string | Zona OMI corrente (es. `B29`) |
+| `municipality_code` | string | Codice catastale del comune |
+| `property_type` | string | Tipo immobiliare (es. `Abitazioni civili`) |
+| `condition` | string | Stato conservativo (es. `NORMALE`) |
+| `semesters` | array | Serie storica semestrale (vedi sotto) |
+| `metrics` | object\|null | Metriche aggregate calcolate (può essere `null`) |
+| `annotations` | object\|null | Annotazioni (può essere `null`) |
+| `data_version` | string | Versione del dataset (es. `omi_2015_1..2025_2_v1`) |
+| `source` | string | Fonte (es. `omi_historical_enrichment`) |
+| `updated_at` | string | Timestamp ISO 8601 dell'ultimo aggiornamento |
+
+Ogni elemento di `semesters`:
+
+| Campo | Tipo | Descrizione |
+|---|---|---|
+| `semester` | string | Semestre nel formato `AAAA_N` (es. `2015_1`, `2025_2`) |
+| `zone` | string | Zona OMI del semestre |
+| `purchase.min_eur_m2` | float | Quotazione acquisto minima (€/m²) |
+| `purchase.max_eur_m2` | float | Quotazione acquisto massima (€/m²) |
+| `purchase.mid_eur_m2` | float | Quotazione acquisto media (€/m²) |
+| `rental.min_eur_m2` | float | Canone locazione minimo (€/m²/mese) |
+| `rental.max_eur_m2` | float | Canone locazione massimo (€/m²/mese) |
+| `rental.mid_eur_m2` | float | Canone locazione medio (€/m²/mese) |
+| `gross_yield_pct` | float | Rendimento lordo da locazione (%) |
+
 ---
 
 ## 9. Fonti dati
@@ -840,9 +927,12 @@ Array vuoto `[]` se nessun POI è presente nella particella.
 | Copertura suolo | CORINE Land Cover 2018 — Copernicus/EEA | 2018 |
 | Uso del suolo | Urban Atlas 2018 — Copernicus/EEA | 2018 |
 | Quotazioni immobiliari | OMI — Agenzia delle Entrate | 2° sem. 2025 (con confronto 1° sem. 2025) |
+| Storico quotazioni (OMI) | OMI — Agenzia delle Entrate (serie semestrale) | 2015–2025 |
 | Erosione costiera | ISPRA — Dinamica litorale | 2006–2020 |
 | Vincoli culturali | MiBACT — Vincoli in rete | 2024 |
 | Punti di interesse | Foursquare Places | 2024 |
+| Potenziale fotovoltaico | JRC PVGIS-SARAH3 v5.3 + metodologia Zornade v1.1 | 2025 |
+| Luci notturne | NASA VIIRS Black Marble (VNP46A4) | 2023 |
 | CAP subcomunali | Poste Italiane / ISTAT | 2025 |
 
 ---
@@ -891,7 +981,7 @@ def api_get(endpoint, params=None):
     req = urllib.request.Request(url, method="GET")
     req.add_header("x-api-key", API_KEY)
     req.add_header("Accept", "application/json")
-    req.add_header("User-Agent", "ZornadeQGISPlugin/2.0")
+    req.add_header("User-Agent", "ZornadeQGISPlugin/3.0")
 
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode("utf-8"))
@@ -977,7 +1067,7 @@ curl -H "x-api-key: $KEY" \
 
 5. **Null handling:** tutti i campi delle sezioni possono essere `null`. Il plugin deve gestire i `null` gracefully (non fare `.get()` senza default su campi annidati).
 
-6. **User-Agent:** usare un User-Agent identificativo (es. `ZornadeQGISPlugin/2.0`) per tracking analytics.
+6. **User-Agent:** usare un User-Agent identificativo (es. `ZornadeQGISPlugin/3.0`) per tracking analytics.
 
 7. **Timeout:** consigliato 30 secondi per le richieste di dettaglio particella e geocoding.
 
@@ -989,7 +1079,7 @@ curl -H "x-api-key: $KEY" \
        "hostname": "app.zornade.com",
        "event": "qgis_api_call",
        "path": "/api/v2/parcels/" + str(fid),
-       "ua": "ZornadeQGISPlugin/2.0",
+       "ua": "ZornadeQGISPlugin/3.0",
        "source": "qgis-plugin"
    }).encode()
    req = urllib.request.Request(

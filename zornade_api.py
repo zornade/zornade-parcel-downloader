@@ -16,13 +16,6 @@ from typing import Optional, Dict, Any, List
 
 API_BASE_URL = "https://api.zornade.com/api/v2"
 
-SUPABASE_ANON_KEY = (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1cHF3ZnFqZnB3cmFwZ25vZ2p2"
-    "Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3NTA0OTAsImV4cCI6MjA1ODMy"
-    "NjQ5MH0.1oNlHmxpMx3yy0vx6DM4Oqs_ZuZfOwAZ4X0LhmrmGZ8"
-)
-
 
 class ZornadeApiError(Exception):
     """Errore specifico dell'API Zornade."""
@@ -53,14 +46,24 @@ class ZornadeApiClient:
                         if v is not None}
             url = f"{url}?{urllib.parse.urlencode(filtered)}"
 
+        # Sicurezza: ammetti esclusivamente lo schema HTTPS. La base URL è
+        # hardcoded su https://api.zornade.com, ma validiamo comunque lo
+        # schema per bloccare file:// o schemi custom inattesi (Bandit B310).
+        if urllib.parse.urlparse(url).scheme != "https":
+            raise ZornadeApiError(
+                "Schema URL non consentito: sono ammesse solo richieste HTTPS.",
+                code="INVALID_URL")
+
         req = urllib.request.Request(url, method="GET")
-        req.add_header("Authorization", f"Bearer {SUPABASE_ANON_KEY}")
         req.add_header("x-api-key", self.token)
         req.add_header("Accept", "application/json")
         req.add_header("User-Agent", "ZornadeQGISPlugin/3.0")
 
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            # Lo schema URL è già stato validato come https poco sopra,
+            # quindi l'apertura è sicura (B310 / S310 audited).
+            with urllib.request.urlopen(  # nosec B310  # noqa: S310
+                    req, timeout=30) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")

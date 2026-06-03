@@ -2,19 +2,27 @@
 name=Zornade Particelle Catastali
 qgisMinimumVersion=3.28
 qgisMaximumVersion=4.99
-description=Download enriched Italian cadastral parcels with 90+ attribute fields including terrain, population, buildings, economics, demographics, land cover, land use, valuation, coastal erosion, cultural heritage and POI data via the free Zornade API v2.4.
-version=3.0.0
+description=Download enriched Italian cadastral parcels with 110+ attribute fields including terrain, population, buildings, economics, demographics, land cover, land use, OMI valuation and valuation history, coastal erosion, cultural heritage, POI, solar PV potential and nightlights data via the free Zornade API v2.4.
+version=3.1.0
 author=Zornade
 email=e.pascatti@gmail.com
 
-about=Professional QGIS plugin to download enriched Italian cadastral parcels via the free Zornade API v2.4 (100%% free, 1,000 req/hour). Search by GPS coordinates, map canvas bounding box (adaptive quadtree subdivision), or cadastral reference (fuzzy municipality name, sheet, parcel, section). Each parcel includes 90+ attribute fields across 17 data sections: accurate geometry (Polygon/MultiPolygon), CORINE land cover classification, Urban Atlas land use, seismic zone (1–4), PGA, flood and landslide risk, subsidence analysis (velocity, acceleration, risk class, direction, trend), terrain (elevation, slope, aspect, ruggedness), population estimates (WorldPop/dasymetric), building footprints, economics (average income, Gini index, affordability PIR, income brackets), demographics (census 2021: age, education, employment, foreigners, households, dwellings), OMI real estate valuation (purchase and rental ranges with previous semester), coastal erosion, cultural heritage (MiBACT), Foursquare POI. Sketching: categorized renderer for CORINE land cover (5 Level-1 classes), seismic zone (4 classes), and subsidence risk (5 classes). Scale-dependent labeling. Default search by map canvas bbox. Native Qt6 interface with geocoding, map picking, async download via QgsTask with retry logic. Free API tokens at app.zornade.com.
+about=Professional QGIS plugin to download enriched Italian cadastral parcels via the free Zornade API v2.4 (100%% free, 1,000 req/hour). Search by GPS coordinates, map canvas bounding box (adaptive quadtree subdivision), or cadastral reference (fuzzy municipality name, sheet, parcel, section). Each parcel includes 110+ attribute fields across 20 data sections: accurate geometry (Polygon/MultiPolygon), CORINE land cover classification, Urban Atlas land use, seismic zone (1–4), PGA, flood and landslide risk, subsidence analysis (velocity, acceleration, risk class, direction, trend), terrain (elevation, slope, aspect, ruggedness), population estimates (WorldPop/dasymetric), building footprints, economics (average income, Gini index, affordability PIR, income brackets), demographics (census 2021: age, education, employment, foreigners, households, dwellings), OMI real estate valuation (purchase and rental ranges with previous semester), OMI valuation history (semestral series 2015–2025 with gross yield), coastal erosion, cultural heritage (MiBACT), Foursquare POI, solar photovoltaic potential (JRC PVGIS-SARAH3: kWp, annual yield, payback, NPV, LCOE, viability class), and nightlights (NASA VIIRS Black Marble VNP46A4 luminosity class and radiance). Sketching: categorized renderer for CORINE land cover (5 Level-1 classes), seismic zone (4 classes), and subsidence risk (5 classes). Scale-dependent labeling. Default search by map canvas bbox. The map view is no longer moved after download by default (opt-in checkbox). Native Qt6 interface with geocoding, map picking, async download via QgsTask with retry logic. Free API tokens at app.zornade.com.
 
 tracker=https://github.com/menimenocchio/zornade-parcel-downloader/issues
 repository=https://github.com/menimenocchio/zornade-parcel-downloader
 homepage=https://zornade.com
 
 hasProcessingProvider=no
-changelog=3.0.0 - Complete API v2.4 alignment: 90+ attribute fields, all 17 data sections
+changelog=3.1.0 - 3 new data sections, map view no longer moves on download
+    - FIX: the map canvas is no longer recentered/zoomed after a download; a new opt-in checkbox "Sposta la vista sulle particelle scaricate" (off by default, persisted) restores the old behavior on demand
+    - NEW: solar section (JRC PVGIS-SARAH3 photovoltaic potential): availability, building count, max kWp, modern/pessimistic annual yield, simple payback, 20y NPV, CAPEX, LCOE, viability class
+    - NEW: nightlights section (NASA VIIRS Black Marble VNP46A4): luminosity class, parcel radiance, density, share, municipal mean, year
+    - NEW: valuation_history section (OMI semestral series 2015–2025): historical zone, semester count, first/last semester, first/last mid purchase €/m², last mid rental €/m², last gross yield, and computed purchase change %%
+    - 113 attribute fields mapped from API v2.4 response (was 90+), now covering all 20 data sections
+    - DOCS: bundled API reference updated with solar, nightlights and valuation_history sections
+    - CLEANUP: removed the embedded Supabase anon JWT and the Authorization Bearer header; only the x-api-key header is required
+    3.0.0 - Complete API v2.4 alignment: 90+ attribute fields, all 17 data sections
     - CRITICAL FIX: added mandatory Authorization Bearer header for Supabase Edge Functions
     - CRITICAL FIX: search endpoint now uses correct API v2.4 params (comune, foglio, label, sezione)
     - CRITICAL FIX: parcel detail now sends include=all to receive all data sections

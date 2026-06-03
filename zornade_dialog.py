@@ -16,7 +16,7 @@ from qgis.PyQt.QtWidgets import (
     QLabel, QPushButton, QLineEdit, QSpinBox,
     QTabWidget, QWidget, QGroupBox, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView,
-    QProgressBar, QComboBox,
+    QProgressBar, QComboBox, QCheckBox,
     QMessageBox, QApplication,
     QAbstractItemView,
 )
@@ -38,8 +38,10 @@ from .zornade_sketching import (
 # Settings Keys
 # ======================================================================
 
-SETTINGS_TOKEN_KEY = "zornade/api_token"
+# Chiavi QSettings (nomi di impostazione, NON credenziali).
+SETTINGS_TOKEN_KEY = "zornade/api_token"  # nosec B105
 SETTINGS_STYLE_KEY = "zornade/default_style"
+SETTINGS_ZOOM_KEY = "zornade/zoom_to_layer"
 
 
 
@@ -262,6 +264,15 @@ class ZornadeDialog(QDialog):
         opts_row.addWidget(self.style_combo)
         root.addLayout(opts_row)
 
+        # Zoom alle particelle dopo il download — disattivato di default
+        # per non spostare la vista mappa corrente dell'utente.
+        self.chk_zoom_to_layer = QCheckBox(
+            "Sposta la vista sulle particelle scaricate")
+        self.chk_zoom_to_layer.setChecked(False)
+        self.chk_zoom_to_layer.setToolTip(
+            "Se disattivato, la vista mappa resta dov'è dopo il download.")
+        root.addWidget(self.chk_zoom_to_layer)
+
         # ── Progress ──
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
@@ -413,6 +424,9 @@ class ZornadeDialog(QDialog):
         idx = self.style_combo.findData(style_key)
         if idx >= 0:
             self.style_combo.setCurrentIndex(idx)
+        # Zoom preference (default False → la vista mappa non viene spostata)
+        zoom_pref = s.value(SETTINGS_ZOOM_KEY, False, type=bool)
+        self.chk_zoom_to_layer.setChecked(bool(zoom_pref))
 
     def _save_token(self):
         token = self.token_input.text().strip()
@@ -839,6 +853,10 @@ class ZornadeDialog(QDialog):
         QSettings().setValue(
             SETTINGS_STYLE_KEY,
             self.style_combo.currentData())
+        # Save zoom preference
+        QSettings().setValue(
+            SETTINGS_ZOOM_KEY,
+            self.chk_zoom_to_layer.isChecked())
 
         # UI state
         self.btn_download.setEnabled(False)
@@ -899,8 +917,10 @@ class ZornadeDialog(QDialog):
                 style_key = self.style_combo.currentData()
                 apply_sketching(layer, style_key)
                 QgsProject.instance().addMapLayer(layer)
-                # Zoom to layer: CRS transform + 5% buffer
-                self._zoom_to_layer(layer)
+                # Zoom alla particelle SOLO se l'utente lo ha richiesto:
+                # di default la vista mappa corrente resta invariata.
+                if self.chk_zoom_to_layer.isChecked():
+                    self._zoom_to_layer(layer)
                 count = layer.featureCount()
                 self.status_label.setText(
                     f"Layer creato con {count} "
@@ -973,7 +993,7 @@ class ZornadeDialog(QDialog):
     def _flatten_parcel(self, data: dict) -> dict:
         """Appiattisce la struttura annidata dell'API v2 in un dict piatto.
 
-        Mappa tutti i 17 sezioni della risposta API v2.4 /parcels/{id}
+        Mappa tutte le 20 sezioni della risposta API v2.4 /parcels/{id}
         in attributi piatti per il layer QGIS.
         """
         flat = {}
@@ -1277,6 +1297,98 @@ class ZornadeDialog(QDialog):
             flat["poi_first"] = None
             flat["poi_categories"] = None
 
+        # -- Solar (PVGIS v1.1, aggregato di particella) --
+        solar = data.get("solar")
+        if isinstance(solar, dict) and solar.get("available"):
+            flat["solar_available"] = "S\u00ec"
+            flat["solar_n_buildings"] = solar.get("n_buildings")
+            flat["solar_kwp_max"] = sf(solar.get("kwp_max_total"))
+            flat["solar_pvout_modern"] = sf(
+                solar.get("pvout_modern_kwh_year_total"))
+            flat["solar_pvout_pess"] = sf(
+                solar.get("pvout_pessimistic_kwh_year_total"))
+            flat["solar_payback_years"] = sf(
+                solar.get("payback_years_simple_avg"))
+            flat["solar_npv_20y"] = sf(solar.get("npv_20y_eur_total"))
+            flat["solar_capex"] = sf(solar.get("capex_eur_total"))
+            flat["solar_lcoe"] = sf(solar.get("lcoe_eur_per_kwh_avg"))
+            flat["solar_viability"] = solar.get("viability_class_max")
+        else:
+            flat["solar_available"] = "No" if isinstance(solar, dict) else None
+            flat["solar_n_buildings"] = None
+            flat["solar_kwp_max"] = None
+            flat["solar_pvout_modern"] = None
+            flat["solar_pvout_pess"] = None
+            flat["solar_payback_years"] = None
+            flat["solar_npv_20y"] = None
+            flat["solar_capex"] = None
+            flat["solar_lcoe"] = None
+            flat["solar_viability"] = None
+
+        # -- Nightlights (VIIRS Black Marble VNP46A4) --
+        ntl = data.get("nightlights")
+        if isinstance(ntl, dict) and ntl.get("available"):
+            flat["ntl_class"] = ntl.get("ntl_class")
+            flat["ntl_parcel"] = sf(ntl.get("ntl_parcel"))
+            flat["ntl_density"] = sf(ntl.get("ntl_density"))
+            flat["ntl_share"] = sf(ntl.get("ntl_share"))
+            flat["ntl_mean_comune"] = sf(ntl.get("ntl_mean_comune"))
+            flat["ntl_year"] = ntl.get("ntl_year")
+        else:
+            flat["ntl_class"] = None
+            flat["ntl_parcel"] = None
+            flat["ntl_density"] = None
+            flat["ntl_share"] = None
+            flat["ntl_mean_comune"] = None
+            flat["ntl_year"] = None
+
+        # -- Valuation history (OMI storico, Abitazioni civili NORMALE) --
+        vh = data.get("valuation_history")
+        if isinstance(vh, dict):
+            sems = vh.get("semesters")
+            sems = sems if isinstance(sems, list) else []
+            flat["vh_zone"] = vh.get("zone_current")
+            flat["vh_semesters"] = len(sems)
+            first_buy_mid = None
+            last_buy_mid = None
+            if sems:
+                first = sems[0]
+                last = sems[-1]
+                flat["vh_first_sem"] = first.get("semester")
+                flat["vh_last_sem"] = last.get("semester")
+                fb = first.get("purchase")
+                if isinstance(fb, dict):
+                    first_buy_mid = sf(fb.get("mid_eur_m2"))
+                lb = last.get("purchase")
+                if isinstance(lb, dict):
+                    last_buy_mid = sf(lb.get("mid_eur_m2"))
+                lr = last.get("rental")
+                flat["vh_last_rent_mid"] = (
+                    sf(lr.get("mid_eur_m2")) if isinstance(lr, dict) else None)
+                flat["vh_last_yield"] = sf(last.get("gross_yield_pct"))
+            else:
+                flat["vh_first_sem"] = None
+                flat["vh_last_sem"] = None
+                flat["vh_last_rent_mid"] = None
+                flat["vh_last_yield"] = None
+            flat["vh_first_buy_mid"] = first_buy_mid
+            flat["vh_last_buy_mid"] = last_buy_mid
+            if first_buy_mid and last_buy_mid:
+                flat["vh_buy_change_pct"] = round(
+                    (last_buy_mid - first_buy_mid) / first_buy_mid * 100.0, 1)
+            else:
+                flat["vh_buy_change_pct"] = None
+        else:
+            flat["vh_zone"] = None
+            flat["vh_semesters"] = None
+            flat["vh_first_sem"] = None
+            flat["vh_last_sem"] = None
+            flat["vh_first_buy_mid"] = None
+            flat["vh_last_buy_mid"] = None
+            flat["vh_last_rent_mid"] = None
+            flat["vh_last_yield"] = None
+            flat["vh_buy_change_pct"] = None
+
         return flat
 
     def _extract_geometry(self, data: dict) -> QgsGeometry:
@@ -1397,6 +1509,34 @@ class ZornadeDialog(QDialog):
         ("poi_count",           QVariant.Int,      "N. Punti Interesse"),
         ("poi_first",           QVariant.String,   "POI Principale"),
         ("poi_categories",      QVariant.String,   "Categorie POI"),
+        # Solar (fotovoltaico PVGIS)
+        ("solar_available",     QVariant.String,   "Solare Disponibile"),
+        ("solar_n_buildings",   QVariant.Int,      "N. Edifici Solare"),
+        ("solar_kwp_max",       QVariant.Double,   "Potenza Max (kWp)"),
+        ("solar_pvout_modern",  QVariant.Double,   "Produzione (kWh/a)"),
+        ("solar_pvout_pess",    QVariant.Double,   "Produzione Pess. (kWh/a)"),
+        ("solar_payback_years", QVariant.Double,   "Payback (anni)"),
+        ("solar_npv_20y",       QVariant.Double,   "VAN 20 anni (\u20ac)"),
+        ("solar_capex",         QVariant.Double,   "CAPEX (\u20ac)"),
+        ("solar_lcoe",          QVariant.Double,   "LCOE (\u20ac/kWh)"),
+        ("solar_viability",     QVariant.String,   "Classe Viabilit\u00e0 Solare"),
+        # Nightlights (luci notturne VIIRS)
+        ("ntl_class",           QVariant.String,   "Classe Luci Notturne"),
+        ("ntl_parcel",          QVariant.Double,   "Luminosit\u00e0 Particella"),
+        ("ntl_density",         QVariant.Double,   "Densit\u00e0 Luminosa"),
+        ("ntl_share",           QVariant.Double,   "Quota Luminosa"),
+        ("ntl_mean_comune",     QVariant.Double,   "Media Comune (luci)"),
+        ("ntl_year",            QVariant.Int,      "Anno Luci Notturne"),
+        # Valuation history (storico OMI)
+        ("vh_zone",             QVariant.String,   "Zona OMI Storica"),
+        ("vh_semesters",        QVariant.Int,      "N. Semestri OMI"),
+        ("vh_first_sem",        QVariant.String,   "Primo Semestre"),
+        ("vh_last_sem",         QVariant.String,   "Ultimo Semestre"),
+        ("vh_first_buy_mid",    QVariant.Double,   "Acquisto Iniziale (\u20ac/m\u00b2)"),
+        ("vh_last_buy_mid",     QVariant.Double,   "Acquisto Attuale (\u20ac/m\u00b2)"),
+        ("vh_last_rent_mid",    QVariant.Double,   "Affitto Attuale (\u20ac/m\u00b2)"),
+        ("vh_last_yield",       QVariant.Double,   "Rendimento Lordo (%)"),
+        ("vh_buy_change_pct",   QVariant.Double,   "Var. Acquisto (%)"),
     ]
 
     def _create_layer(self, results: list) -> Optional[QgsVectorLayer]:
