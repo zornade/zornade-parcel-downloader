@@ -20,10 +20,13 @@ API_BASE_URL = "https://api.zornade.com/api/v2"
 class ZornadeApiError(Exception):
     """Errore specifico dell'API Zornade."""
 
-    def __init__(self, message: str, code: str = "", status: int = 0):
+    def __init__(self, message: str, code: str = "", status: int = 0,
+                 retry_after: Optional[int] = None):
         super().__init__(message)
         self.code = code
         self.status = status
+        # Secondi suggeriti dal server prima di riprovare (429 / 503).
+        self.retry_after = retry_after
 
 
 class ZornadeApiClient:
@@ -57,7 +60,7 @@ class ZornadeApiClient:
         req = urllib.request.Request(url, method="GET")
         req.add_header("x-api-key", self.token)
         req.add_header("Accept", "application/json")
-        req.add_header("User-Agent", "ZornadeQGISPlugin/3.0")
+        req.add_header("User-Agent", "ZornadeQGISPlugin/3.2")
 
         try:
             # Lo schema URL è già stato validato come https poco sopra,
@@ -67,6 +70,7 @@ class ZornadeApiClient:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
+            retry_after = None
             try:
                 err = json.loads(body)
                 err_field = err.get("error", "")
@@ -76,6 +80,12 @@ class ZornadeApiClient:
                 else:
                     code = str(err_field)
                     msg = err.get("message", str(exc))
+                # Il body del 429 espone retry_after_seconds.
+                if isinstance(err, dict) and err.get("retry_after_seconds"):
+                    try:
+                        retry_after = int(err["retry_after_seconds"])
+                    except (TypeError, ValueError):
+                        retry_after = None
             except (json.JSONDecodeError, ValueError):
                 # HTML error pages (e.g. Cloudflare 502/503) — don't dump raw HTML
                 if exc.code >= 500:
@@ -83,7 +93,16 @@ class ZornadeApiClient:
                     msg = f"Server temporaneamente non disponibile (HTTP {exc.code})"
                 else:
                     code, msg = "", str(exc)
-            raise ZornadeApiError(msg, code=code, status=exc.code) from exc
+            # L'header Retry-After ha la precedenza se presente.
+            hdr_retry = exc.headers.get("Retry-After") if exc.headers else None
+            if hdr_retry:
+                try:
+                    retry_after = int(hdr_retry)
+                except (TypeError, ValueError):
+                    pass
+            raise ZornadeApiError(
+                msg, code=code, status=exc.code,
+                retry_after=retry_after) from exc
         except urllib.error.URLError as exc:
             raise ZornadeApiError(
                 f"Errore di connessione: {exc.reason}") from exc

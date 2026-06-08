@@ -7,6 +7,8 @@ mappa picking, tabella risultati, progress bar, gestione token.
 
 import json
 import math
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional, List, Dict, Any
 
 from qgis.PyQt.QtCore import Qt, QSettings, QUrl, QVariant
@@ -42,6 +44,15 @@ from .zornade_sketching import (
 SETTINGS_TOKEN_KEY = "zornade/api_token"  # nosec B105
 SETTINGS_STYLE_KEY = "zornade/default_style"
 SETTINGS_ZOOM_KEY = "zornade/zoom_to_layer"
+SETTINGS_CONCURRENCY_KEY = "zornade/download_concurrency"
+
+# Richieste di dettaglio eseguite in parallelo. Non esiste un endpoint batch
+# lato API: ogni particella è una richiesta HTTP. Test empirici (load_test.py)
+# mostrano 100%% di successo e latenza p50 stabile (~1.2s) fino a 50 richieste
+# concorrenti, con throughput che scala quasi linearmente fino a ~40. Default
+# prudente a 10, massimo 20 per lasciare margine al server condiviso.
+DEFAULT_CONCURRENCY = 10
+MAX_CONCURRENCY = 20
 
 
 
@@ -51,56 +62,118 @@ SETTINGS_ZOOM_KEY = "zornade/zoom_to_layer"
 # ======================================================================
 
 class DownloadTask(QgsTask):
-    """QgsTask per il download asincrono delle particelle arricchite.
+    """QgsTask per il download asincrono e parallelo delle particelle.
 
     Usa QgsTask invece di QThread come da best practice QGIS:
     - run() eseguito in background, restituisce True/False
     - finished() eseguito sul thread principale (sicuro per GUI)
     - isCanceled() per annullamento cooperativo
     - setProgress() per aggiornamento progressi
+
+    Il dettaglio di ogni particella è una richiesta HTTP indipendente (l'API
+    non offre un endpoint batch), quindi le richieste vengono eseguite con un
+    pool di thread a concorrenza limitata. La raccolta dei risultati e
+    l'aggiornamento del progresso avvengono sul thread di run() (single
+    writer), così non servono lock sui risultati.
     """
 
+    MAX_RETRIES = 3
+    RETRY_WAIT = 2          # secondi base per backoff sui 5xx
+    MAX_RETRY_AFTER = 65    # tetto massimo all'attesa su 429 (secondi)
+
     def __init__(self, description: str, api: ZornadeApiClient,
-                 parcel_ids: list):
+                 parcel_ids: list,
+                 concurrency: int = DEFAULT_CONCURRENCY):
         super().__init__(description, QgsTask.CanCancel)
         self.api = api
         self.parcel_ids = parcel_ids
+        self.concurrency = max(1, min(int(concurrency), MAX_CONCURRENCY))
         self.results: list = []
         self.error_msg: Optional[str] = None
+        # Evento condiviso per fermare i worker durante un backoff/attesa.
+        self._cancel_event = threading.Event()
 
-    MAX_RETRIES = 3
-    RETRY_WAIT = 2  # seconds between retries
+    def cancel(self):
+        # Chiamato dal thread principale: sblocca subito i worker in attesa.
+        self._cancel_event.set()
+        super().cancel()
+
+    def _wait_cancellable(self, seconds: float) -> bool:
+        """Attende fino a `seconds`, ma si interrompe se il task è annullato.
+
+        Ritorna True se nel frattempo è arrivata la cancellazione.
+        """
+        return self._cancel_event.wait(timeout=seconds)
+
+    def _fetch_one(self, pid):
+        """Scarica una singola particella con retry su 429 e 5xx.
+
+        Ritorna una tupla (pid, data, error):
+        - data valorizzato in caso di successo
+        - error valorizzato in caso di fallimento definitivo
+        - (pid, None, None) se annullato durante l'esecuzione
+        """
+        last_exc = None
+        for attempt in range(self.MAX_RETRIES):
+            if self._cancel_event.is_set():
+                return (pid, None, None)
+            try:
+                resp = self.api.get_parcel_detail(pid)
+                return (pid, resp.get("data", resp), None)
+            except ZornadeApiError as exc:
+                last_exc = exc
+                is_last = attempt >= self.MAX_RETRIES - 1
+                # 429: rispetta Retry-After/retry_after_seconds del server.
+                if exc.status == 429 and not is_last:
+                    wait = min(exc.retry_after or 60, self.MAX_RETRY_AFTER)
+                    if self._wait_cancellable(wait):
+                        return (pid, None, None)
+                    continue
+                # 5xx: backoff esponenziale.
+                if exc.status >= 500 and not is_last:
+                    if self._wait_cancellable(self.RETRY_WAIT * (attempt + 1)):
+                        return (pid, None, None)
+                    continue
+                return (pid, None, exc)
+            except Exception as exc:  # noqa: BLE001
+                return (pid, None, exc)
+        return (pid, None, last_exc)
 
     def run(self):
-        import time
         total = len(self.parcel_ids)
-        for i, pid in enumerate(self.parcel_ids):
-            if self.isCanceled():
-                return False
-            last_exc = None
-            for attempt in range(self.MAX_RETRIES):
+        if total == 0:
+            return True
+        done = 0
+        aborted = False
+        with ThreadPoolExecutor(max_workers=self.concurrency) as ex:
+            futures = {
+                ex.submit(self._fetch_one, pid): pid
+                for pid in self.parcel_ids
+            }
+            for fut in as_completed(futures):
                 if self.isCanceled():
-                    return False
-                try:
-                    resp = self.api.get_parcel_detail(pid)
-                    data = resp.get("data", resp)
-                    self.results.append(data)
-                    self.setProgress((i + 1) * 100.0 / total)
-                    last_exc = None
+                    self._cancel_event.set()
+                    aborted = True
                     break
-                except ZornadeApiError as exc:
-                    last_exc = exc
-                    if exc.status >= 500 and attempt < self.MAX_RETRIES - 1:
-                        time.sleep(self.RETRY_WAIT * (attempt + 1))
-                        continue
-                    self.error_msg = (
-                        f"Errore particella {pid}: {exc} "
-                        f"(HTTP {exc.status})")
-                    return False
-                except Exception as exc:
-                    self.error_msg = f"Errore imprevisto per {pid}: {exc}"
-                    return False
-        return True
+                pid, data, err = fut.result()
+                if err is not None:
+                    status = getattr(err, "status", 0)
+                    if status:
+                        self.error_msg = (
+                            f"Errore particella {pid}: {err} (HTTP {status})")
+                    else:
+                        self.error_msg = f"Errore imprevisto per {pid}: {err}"
+                    # Ferma i worker ancora in coda e abortisci il download.
+                    self._cancel_event.set()
+                    aborted = True
+                    break
+                if data is not None:
+                    self.results.append(data)
+                done += 1
+                self.setProgress(done * 100.0 / total)
+        if aborted:
+            return False
+        return not self.isCanceled()
 
     def finished(self, result):
         pass  # Gestito tramite taskCompleted / taskTerminated
@@ -273,6 +346,19 @@ class ZornadeDialog(QDialog):
             "Se disattivato, la vista mappa resta dov'è dopo il download.")
         root.addWidget(self.chk_zoom_to_layer)
 
+        # Concorrenza: numero di richieste di dettaglio eseguite in parallelo.
+        conc_row = QHBoxLayout()
+        conc_row.addWidget(QLabel("Richieste in parallelo:"))
+        self.concurrency_spin = QSpinBox()
+        self.concurrency_spin.setRange(1, MAX_CONCURRENCY)
+        self.concurrency_spin.setValue(DEFAULT_CONCURRENCY)
+        self.concurrency_spin.setToolTip(
+            "Quante particelle scaricare contemporaneamente. Valori più alti "
+            "velocizzano il download; 10 è un buon compromesso.")
+        conc_row.addWidget(self.concurrency_spin)
+        conc_row.addStretch(1)
+        root.addLayout(conc_row)
+
         # ── Progress ──
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
@@ -427,6 +513,10 @@ class ZornadeDialog(QDialog):
         # Zoom preference (default False → la vista mappa non viene spostata)
         zoom_pref = s.value(SETTINGS_ZOOM_KEY, False, type=bool)
         self.chk_zoom_to_layer.setChecked(bool(zoom_pref))
+        # Concorrenza download (default DEFAULT_CONCURRENCY)
+        conc = s.value(SETTINGS_CONCURRENCY_KEY, DEFAULT_CONCURRENCY, type=int)
+        self.concurrency_spin.setValue(
+            max(1, min(int(conc), MAX_CONCURRENCY)))
 
     def _save_token(self):
         token = self.token_input.text().strip()
@@ -857,6 +947,10 @@ class ZornadeDialog(QDialog):
         QSettings().setValue(
             SETTINGS_ZOOM_KEY,
             self.chk_zoom_to_layer.isChecked())
+        # Save concurrency preference
+        QSettings().setValue(
+            SETTINGS_CONCURRENCY_KEY,
+            self.concurrency_spin.value())
 
         # UI state
         self.btn_download.setEnabled(False)
@@ -868,7 +962,8 @@ class ZornadeDialog(QDialog):
 
         # Start task (QgsTask via task manager)
         task = DownloadTask(
-            "Zornade - Download particelle", self._api, ids)
+            "Zornade - Download particelle", self._api, ids,
+            concurrency=self.concurrency_spin.value())
         task.progressChanged.connect(self._on_task_progress)
         task.taskCompleted.connect(
             lambda: self._on_download_completed())
