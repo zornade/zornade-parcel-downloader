@@ -17,6 +17,7 @@ def create_plugin_zip():
         "metadata.txt",
         "icon.png",
         "README.md",
+        "CHANGELOG.md",
         "LICENSE",
     ]
 

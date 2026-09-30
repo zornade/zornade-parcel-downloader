@@ -1,5 +1,5 @@
 """
-Zornade API v2 Client — Dati Catastali e Geocoding.
+Zornade API v2 Client - Dati Catastali e Geocoding.
 
 Accede agli endpoint REST gratuiti di Zornade per particelle catastali
 arricchite, geocoding diretto e inverso.
@@ -30,7 +30,7 @@ class ZornadeApiError(Exception):
 
 
 class ZornadeApiClient:
-    """Client per Zornade API v2 — Dati Catastali e Geocoding."""
+    """Client per Zornade API v2 - Dati Catastali e Geocoding."""
 
     def __init__(self, token: str):
         self.token = token.strip()
@@ -87,7 +87,7 @@ class ZornadeApiClient:
                     except (TypeError, ValueError):
                         retry_after = None
             except (json.JSONDecodeError, ValueError):
-                # HTML error pages (e.g. Cloudflare 502/503) — don't dump raw HTML
+                # HTML error pages (e.g. Cloudflare 502/503) - don't dump raw HTML
                 if exc.code >= 500:
                     code = str(exc.code)
                     msg = f"Server temporaneamente non disponibile (HTTP {exc.code})"
@@ -151,10 +151,10 @@ class ZornadeApiClient:
         Scope: parcels:read
 
         Parametri API v2.4:
-          comune   — nome comune (fuzzy, es. 'Roma')
-          foglio   — numero foglio catastale
-          label    — etichetta particella
-          sezione  — sezione amministrativa
+          comune   - nome comune (fuzzy, es. 'Roma')
+          foglio   - numero foglio catastale
+          label    - etichetta particella
+          sezione  - sezione amministrativa
         """
         return self._request("parcels/search", {
             "comune": comune,
@@ -187,7 +187,7 @@ class ZornadeApiClient:
     # ------------------------------------------------------------------
 
     def geocode_search(self, query: str, limit: int = 5) -> Dict:
-        """Geocoding diretto — indirizzo → coordinate.
+        """Geocoding diretto - indirizzo → coordinate.
 
         Endpoint: GET /geocode/search
         Scope: geocoding:read
@@ -198,7 +198,7 @@ class ZornadeApiClient:
 
     def geocode_reverse(self, lat: float, lng: float,
                         radius: int = 100, limit: int = 5) -> Dict:
-        """Geocoding inverso — coordinate → indirizzo.
+        """Geocoding inverso - coordinate → indirizzo.
 
         Endpoint: GET /geocode/reverse
         Scope: geocoding:read
@@ -213,9 +213,15 @@ class ZornadeApiClient:
     # ------------------------------------------------------------------
 
     def validate_token(self) -> bool:
-        """Verifica la validità del token con una chiamata leggera."""
+        """Verifica la validità del token con una chiamata leggera.
+
+        Usa parcels/locate e non geocode/search per due motivi: la chiave
+        deve avere lo scope parcels:read (quello che serve davvero al plugin)
+        e l'endpoint restituisce dati reali, quindi un 200 qui è una prova
+        effettiva di accesso ai dati, non solo di autenticazione.
+        """
         try:
-            self.geocode_search("Roma", limit=1)
+            self.locate_parcels(41.9009, 12.4833, limit=1)
             return True
         except ZornadeApiError as exc:
             return exc.status not in (401, 403)

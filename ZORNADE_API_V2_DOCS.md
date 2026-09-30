@@ -1,8 +1,8 @@
-# Zornade API v2 — Documentazione Completa
+# Zornade API v2 - Documentazione Completa
 
-**Versione API:** 2.4.0  
+**Versione API:** 2.5.0  
 **Base URL:** `https://api.zornade.com/api/v2`  
-**Ultimo aggiornamento:** 28 aprile 2026
+**Ultimo aggiornamento:** 17 settembre 2026
 
 ---
 
@@ -27,6 +27,7 @@
 9. [Fonti dati](#9-fonti-dati)
 10. [Codici di errore](#10-codici-di-errore)
 11. [Esempi completi](#11-esempi-completi)
+12. [Licenza dati e attribuzione](#12-licenza-dati-e-attribuzione)
 
 ---
 
@@ -62,23 +63,24 @@ curl -H "x-api-key: zrn_bdc6a659..." \
 
 | Limite | Valore |
 |---|---|
-| Richieste per ora | 1000 |
+| Richieste per ora | 10000 |
 
-Ogni risposta autenticata include header di rate limiting:
+Ogni risposta autenticata include header di rate limiting. Il limite e' una finestra scorrevole di un'ora, quindi il reset non cade a un'ora fissa:
 
 | Header | Descrizione |
 |---|---|
-| `X-RateLimit-Limit` | Limite massimo per ora (1000) |
+| `X-RateLimit-Limit` | Limite massimo per ora (10000) |
 | `X-RateLimit-Remaining` | Richieste rimanenti nell'ora corrente |
-| `X-RateLimit-Reset` | Timestamp epoch (secondi) del prossimo reset |
+| `X-RateLimit-Reset` | Timestamp epoch (secondi) in cui la finestra libera il primo posto; assente se nell'ora non c'e' traffico |
+| `X-Zornade-Attribution-Required` | `true` se il token e' sul piano gratuito, cioe' se le risposte richiedono l'attribuzione a Zornade |
 
 Quando il limite è raggiunto, la risposta è:
 ```json
 {
   "error": "RATE_LIMITED",
-  "message": "Rate limit exceeded: 1000 requests/hour. Try again later.",
+  "message": "Rate limit exceeded: 10000 requests/hour. Retry after N seconds.",
   "retry_after_seconds": 60,
-  "limit": 1000
+  "limit": 10000
 }
 ```
 
@@ -121,7 +123,7 @@ Non richiede autenticazione. Restituisce stato e versione API.
   "version": "2.4.0",
   "timestamp": "2026-04-16T09:55:24.469Z",
   "auth": "All endpoints require an API key via x-api-key header. Free keys at https://app.zornade.com/api",
-  "rate_limit": "1000 requests/hour",
+  "rate_limit": "10000 requests/hour",
   "endpoints": [
     "GET /api/v2/geocode/search",
     "GET /api/v2/geocode/reverse",
@@ -333,6 +335,8 @@ Database di 18.7+ milioni di indirizzi ANNCSU (Archivio Nazionale dei Numeri Civ
 ### 6.1 Ricerca indirizzo: `GET /api/v2/geocode/search`
 
 Geocoding diretto: da indirizzo a coordinate.
+
+La ricerca lavora sui NOMI DI VIA (odonimi) dell'archivio ANNCSU. Non trova punti di interesse: query come "Colosseo" o "Duomo" restituiscono 0 risultati. In quei casi usare la via più vicina oppure il geocoding inverso con le coordinate.
 
 **Parametri query:**
 
@@ -549,7 +553,7 @@ Rischi naturali aggregati:
 | Campo | Tipo | Descrizione |
 |---|---|---|
 | `seismic_zone` | integer\|null | Zona sismica INGV (1=più pericolosa, 4=meno pericolosa) |
-| `pga` | float\|null | Peak Ground Acceleration — accelerazione massima al suolo (g) |
+| `pga` | float\|null | Peak Ground Acceleration - accelerazione massima al suolo (g) |
 | `flood_level` | string\|null | Livello rischio alluvioni ISPRA. Valori: `HPH` (elevata), `MPH` (media), `LPH` (bassa) |
 | `landslide_level` | string\|null | Livello rischio frane ISPRA. Valori: `P4` (molto elevata), `AA` (attenzione), `P3` (elevata), `P2` (media), `P1` (moderata) |
 
@@ -614,7 +618,7 @@ Edifici presenti all'interno della particella (da OpenStreetMap):
 
 ### 8.10 `economics`
 
-Dati economici/reddituali dalla dichiarazione IRPEF (MEF — Dipartimento delle Finanze):
+Dati economici/reddituali dalla dichiarazione IRPEF (MEF - Dipartimento delle Finanze):
 
 | Campo | Tipo | Descrizione |
 |---|---|---|
@@ -636,7 +640,7 @@ Dati economici/reddituali dalla dichiarazione IRPEF (MEF — Dipartimento delle 
 | `income_brackets.from_55k_to_75k` | integer\|null | 55.000–75.000 € |
 | `income_brackets.from_75k_to_120k` | integer\|null | 75.000–120.000 € |
 | `income_brackets.over_120k` | integer\|null | > 120.000 € |
-| `source` | string\|null | Fonte e anno (es. `MEF — Dipartimento delle Finanze, IRPEF 2023`) |
+| `source` | string\|null | Fonte e anno (es. `MEF - Dipartimento delle Finanze, IRPEF 2023`) |
 
 ### 8.11 `demographics`
 
@@ -686,7 +690,7 @@ Dati demografici dal Censimento permanente ISTAT 2021, a livello di sezione di c
 | `dwellings.total` | integer\|null | Totale abitazioni |
 | `dwellings.occupied` | integer\|null | Abitazioni occupate |
 | `dwellings.vacant` | integer\|null | Abitazioni vuote |
-| `source` | string\|null | Fonte (es. `ISTAT — Censimento permanente della popolazione 2021`) |
+| `source` | string\|null | Fonte (es. `ISTAT - Censimento permanente della popolazione 2021`) |
 
 **Nota:** `demographics` può essere `null` se il centroide della particella non cade in una sezione di censimento con dati disponibili.
 
@@ -700,7 +704,7 @@ Copertura del suolo CORINE Land Cover 2018:
 | `class` | string | Livello 1 CLC (es. `1` = Superfici artificiali) |
 | `subclass` | string | Livello 2 CLC (es. `11` = Zone urbanizzate) |
 | `description` | string | Livello 3 CLC (es. `112` = Tessuto urbanizzato discontinuo) |
-| `source` | string | Fonte (es. `CORINE Land Cover 2018 — Copernicus/EEA`) |
+| `source` | string | Fonte (es. `CORINE Land Cover 2018 - Copernicus/EEA`) |
 
 Valore `null` se nessun poligono CLC interseca il centroide.
 
@@ -714,7 +718,7 @@ Uso del suolo Urban Atlas 2018:
 | `class` | string | Classe Urban Atlas |
 | `level1` | string | Livello 1 UA |
 | `level2` | string | Livello 2 UA |
-| `source` | string | Fonte (es. `Urban Atlas 2018 — Copernicus/EEA`) |
+| `source` | string | Fonte (es. `Urban Atlas 2018 - Copernicus/EEA`) |
 
 Valore `null` se non coperto da Urban Atlas (disponibile solo per Functional Urban Areas).
 
@@ -911,29 +915,29 @@ Ogni elemento di `semesters`:
 
 ## 9. Fonti dati
 
-| Sezione | Fonte | Aggiornamento |
-|---|---|---|
-| Particelle catastali | Agenzia delle Entrate (WFS AdE) | Continuo |
-| Indirizzi | ANNCSU (ISTAT/Agenzia delle Entrate) | 2026 |
-| Rischio sismico | INGV — Zone sismiche e PGA | 2024 |
-| Alluvioni | ISPRA — Mappa pericolosità alluvioni | 2024 |
-| Frane | ISPRA — Inventario fenomeni franosi | 2024 |
-| Subsidenza | EGMS — European Ground Motion Service | 2023 |
-| Terreno | TINItaly/01 DEM (10m) — INGV | v1.1 |
-| Popolazione | WorldPop + dasymetry | 2020–2023 |
-| Edifici | OpenStreetMap | Continuo |
-| Redditi/Economia | MEF — Dipartimento delle Finanze (IRPEF) | 2023 |
-| Dati demografici | ISTAT — Censimento permanente 2021 | 2021 |
-| Copertura suolo | CORINE Land Cover 2018 — Copernicus/EEA | 2018 |
-| Uso del suolo | Urban Atlas 2018 — Copernicus/EEA | 2018 |
-| Quotazioni immobiliari | OMI — Agenzia delle Entrate | 2° sem. 2025 (con confronto 1° sem. 2025) |
-| Storico quotazioni (OMI) | OMI — Agenzia delle Entrate (serie semestrale) | 2015–2025 |
-| Erosione costiera | ISPRA — Dinamica litorale | 2006–2020 |
-| Vincoli culturali | MiBACT — Vincoli in rete | 2024 |
-| Punti di interesse | Foursquare Places | 2024 |
-| Potenziale fotovoltaico | JRC PVGIS-SARAH3 v5.3 + metodologia Zornade v1.1 | 2025 |
-| Luci notturne | NASA VIIRS Black Marble (VNP46A4) | 2023 |
-| CAP subcomunali | Poste Italiane / ISTAT | 2025 |
+| Sezione | Fonte | Licenza | Aggiornamento |
+|---|---|---|---|
+| Particelle catastali | Agenzia delle Entrate (WFS AdE) | CC BY 4.0 | Continuo |
+| Indirizzi | ANNCSU (ISTAT/Agenzia delle Entrate) | CC BY 4.0 | 2026 |
+| Rischio sismico | INGV - Zone sismiche e PGA | CC BY 4.0 | 2024 |
+| Alluvioni | ISPRA - Mappa pericolosità alluvioni | CC BY 4.0 | 2024 |
+| Frane | ISPRA - Inventario fenomeni franosi | CC BY 4.0 | 2024 |
+| Subsidenza | EGMS - European Ground Motion Service | Copernicus data policy | 2023 |
+| Terreno | TINItaly/01 DEM (10m) - INGV | CC BY 4.0 | v1.1 |
+| Popolazione | WorldPop + dasymetry | CC BY 4.0 | 2020–2023 |
+| Edifici | OpenStreetMap | ODbL 1.0 | Continuo |
+| Redditi/Economia | MEF - Dipartimento delle Finanze (IRPEF) | Dati aperti MEF | 2023 |
+| Dati demografici | ISTAT - Censimento permanente 2021 | CC BY 3.0 IT | 2021 |
+| Copertura suolo | CORINE Land Cover 2018 - Copernicus/EEA | Copernicus data policy | 2018 |
+| Uso del suolo | Urban Atlas 2018 - Copernicus/EEA | Copernicus data policy | 2018 |
+| Quotazioni immobiliari | OMI - Agenzia delle Entrate | Termini AdE (citazione obbligatoria) | 2° sem. 2025 (con confronto 1° sem. 2025) |
+| Storico quotazioni (OMI) | OMI - Agenzia delle Entrate (serie semestrale) | Termini AdE (citazione obbligatoria) | 2015–2025 |
+| Erosione costiera | ISPRA - Dinamica litorale | CC BY 4.0 | 2006–2020 |
+| Vincoli culturali | MiBACT - Vincoli in rete | Dati pubblici MiC | 2024 |
+| Punti di interesse | Foursquare OS Places | Apache 2.0 | 2024 |
+| Potenziale fotovoltaico | OpenStreetMap + JRC PVGIS-SARAH3 v5.3 + metodologia Zornade v1.1 | ODbL 1.0 + PVGIS | 2025 |
+| Luci notturne | NASA VIIRS Black Marble (VNP46A4) | Pubblico dominio (NASA) | 2023 |
+| CAP subcomunali | Elaborazione Zornade su OpenStreetMap | ODbL 1.0 | 2025 |
 
 ---
 
@@ -944,7 +948,7 @@ Ogni elemento di `semesters`:
 | `API_KEY_REQUIRED` | 401 | Header `x-api-key` mancante |
 | `INVALID_API_KEY` | 401 | Token non valido o scaduto |
 | `INSUFFICIENT_SCOPE` | 403 | Token privo dello scope necessario |
-| `RATE_LIMITED` | 429 | Superato il limite di 1000 richieste/ora |
+| `RATE_LIMITED` | 429 | Superato il limite di 10000 richieste/ora |
 | `TOO_MANY_ATTEMPTS` | 429 | Troppi tentativi di autenticazione falliti (IP bloccato per 15 min) |
 | `INVALID_PARAMS` | 400 | Parametri mancanti o non validi |
 | `OUT_OF_BOUNDS` | 400 | Coordinate fuori dall'Italia (lat 35.5–47.5, lng 6.0–19.0) |
@@ -959,7 +963,7 @@ Ogni elemento di `semesters`:
 
 ## 11. Esempi completi
 
-### Python (urllib — compatibile QGIS senza dipendenze esterne)
+### Python (urllib - compatibile QGIS senza dipendenze esterne)
 
 ```python
 import json
@@ -1055,6 +1059,80 @@ curl -H "x-api-key: $KEY" \
 
 ---
 
+## 12. Licenza dati e attribuzione
+
+I dati serviti dalla API sono concessi in uso secondo i Termini d'uso Zornade, pubblicati
+nella pagina "Fonti e attribuzioni" su app.zornade.com. In sintesi:
+
+- **Uso consentito**: integrazione dei dati nei prodotti e nei flussi di lavoro del
+  licenziatario, anche commerciali.
+- **Non consentito**: ridistribuzione a terzi dei dati grezzi, estrazione massiva,
+  ricostruzione di database concorrenti. I limiti di velocità della sezione 2
+  rafforzano tecnicamente questo vincolo.
+- **Attribuzione fonti dati**: obbligatoria per tutte le sezioni e per TUTTI i
+  licenziatari, anche quelli con licenza commerciale, secondo la colonna Licenza
+  della tabella Fonti dati. Per le sezioni derivate da OpenStreetMap
+  (edifici, CAP subcomunali, potenziale fotovoltaico) l'attribuzione
+  "© OpenStreetMap contributors" va mantenuta visibile nei prodotti che espongono
+  questi dati, come richiesto da ODbL 1.0. Nessuna licenza a pagamento può
+  rimuovere queste attribuzioni.
+- **Attribuzione a Zornade**: le chiavi del piano gratuito richiedono di
+  mantenere visibile, nei prodotti che espongono i dati, l'attribuzione
+  "Dati elaborati da Zornade" con link a https://zornade.com. Questa
+  attribuzione è l'unica rinunciabile, ed è rinunciabile SOLO con una licenza
+  commerciale: in tal caso la chiave riporta `plan` diverso da `free` e il campo
+  `zornade_attribution_required` diventa `false`. Le attribuzioni delle fonti
+  dati restano comunque obbligatorie.
+- **Dati non commerciali**: nessuna sezione della API deriva da dati con clausole
+  non commerciali. Il potenziale fotovoltaico è calcolato su edifici OpenStreetMap
+  e irraggiamento JRC PVGIS.
+
+### Campo `meta.licenses`
+
+Ogni risposta di `GET /parcels/:id` include in `meta` la mappa `licenses`, con una
+voce per ogni sezione inclusa:
+
+```json
+{
+  "data": { "...": "..." },
+  "meta": {
+    "sections_included": ["basic", "buildings"],
+    "licenses": {
+      "basic": {
+        "name": "CC BY 4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/deed.it",
+        "attribution": "Agenzia delle Entrate"
+      },
+      "buildings": {
+        "name": "ODbL 1.0",
+        "url": "https://opendatacommons.org/licenses/odbl/1-0/",
+        "attribution": "© OpenStreetMap contributors"
+      }
+    },
+    "attribution_required": true,
+    "zornade_attribution_required": true,
+    "zornade_attribution": {
+      "name": "Zornade",
+      "url": "https://zornade.com",
+      "text": "Dati elaborati da Zornade"
+    },
+    "terms": "Le attribuzioni delle fonti dati (licenses) sono sempre obbligatorie, anche per le licenze commerciali. Le chiavi del piano gratuito richiedono inoltre l'attribuzione a Zornade (zornade_attribution); tale attribuzione e' rinunciabile solo con licenza commerciale. Vietata la ridistribuzione dei dati grezzi e l'estrazione massiva. Le sezioni derivate da OpenStreetMap restano soggette a ODbL 1.0."
+  }
+}
+```
+
+`attribution_required` si riferisce alle sole fonti dati ed è sempre `true`.
+`zornade_attribution_required` vale `true` per le chiavi del piano gratuito e
+`false` per le chiavi con licenza commerciale; `zornade_attribution` contiene
+sempre la stringa pronta da mostrare, indipendentemente dal piano.
+
+Le sezioni a oggetto (`cadastral`, `address`, `risk`, `subsidence`, `terrain`,
+`population`, `buildings`, `economics`, `demographics`, `land_cover`, `land_use`,
+`valuation_history`, `solar`, `nightlights`) portano inoltre il campo `license`
+accanto a `source`, con la stessa struttura `{ name, url, attribution }`.
+
+---
+
 ## Note per lo sviluppatore del plugin QGIS
 
 1. **Autenticazione:** un solo header obbligatorio, `x-api-key`, con il token personale.
@@ -1063,7 +1141,7 @@ curl -H "x-api-key: $KEY" \
 
 3. **Sezioni selettive:** per ridurre payload e latenza, specificare solo le sezioni necessarie nel parametro `include`. Esempio: `include=basic,risk,economics` anziché `all`.
 
-4. **Rate limiting:** con 1000 richieste/ora, un workflow tipico (locate + detail per ogni particella) consuma 2 richieste per particella. Gestire `429` con retry dopo il tempo indicato in `retry_after_seconds`.
+4. **Rate limiting:** con 10000 richieste/ora, un workflow tipico (locate + detail per ogni particella) consuma 2 richieste per particella. Gestire `429` con retry dopo il tempo indicato in `retry_after_seconds`.
 
 5. **Null handling:** tutti i campi delle sezioni possono essere `null`. Il plugin deve gestire i `null` gracefully (non fare `.get()` senza default su campi annidati).
 

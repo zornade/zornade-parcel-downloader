@@ -1,4 +1,4 @@
-# Zornade — Particelle Catastali per QGIS
+# Zornade - Particelle Catastali per QGIS
 
 Plugin QGIS professionale per scaricare **particelle catastali italiane arricchite** tramite le [API v2 gratuite di Zornade](https://zornade.com/api-particelle-catastali).
 
@@ -22,7 +22,7 @@ Plugin QGIS professionale per scaricare **particelle catastali italiane arricchi
 ## Requisiti
 
 - **QGIS** 3.28+
-- **Token API Zornade** (gratuito) — generalo su [app.zornade.com](https://app.zornade.com)
+- **Token API Zornade** (gratuito) - generalo su [app.zornade.com](https://app.zornade.com)
 
 ## Installazione
 
@@ -98,19 +98,25 @@ make deploy
 
 ## API Zornade v2
 
-Le API sono **100% gratuite** con 1.000 richieste/ora. Endpoint utilizzati:
+Le API sono **100% gratuite** con 10.000 richieste/ora. Endpoint utilizzati:
 
-- `GET /api/v2/parcels/locate` — Localizza particelle per coordinate
-- `GET /api/v2/parcels/search` — Cerca per riferimento catastale
-- `GET /api/v2/parcels/{id}` — Profilo arricchito particella
-- `GET /api/v2/geocode/search` — Geocoding diretto
-- `GET /api/v2/geocode/reverse` — Geocoding inverso
+- `GET /api/v2/parcels/locate` - Localizza particelle per coordinate
+- `GET /api/v2/parcels/search` - Cerca per riferimento catastale
+- `GET /api/v2/parcels/{id}` - Profilo arricchito particella
+- `GET /api/v2/geocode/search` - Geocoding diretto
+- `GET /api/v2/geocode/reverse` - Geocoding inverso
 
 Documentazione completa: [zornade.com/api-particelle-catastali](https://zornade.com/api-particelle-catastali)
 
 ## Licenza
 
-GPL-2.0-or-later — [LICENSE](LICENSE)
+GPL-2.0-or-later - [LICENSE](LICENSE)
+
+## Changelog
+
+Tutte le modifiche per versione: [CHANGELOG.md](CHANGELOG.md). Lo stesso
+changelog è mostrato dal Plugin Manager di QGIS (campo `changelog` in
+`metadata.txt`).
 
 ## Supporto
 
@@ -120,4 +126,4 @@ GPL-2.0-or-later — [LICENSE](LICENSE)
 
 ---
 
-**Zornade** — L'ecosistema completo per dati territoriali italiani. 83M+ particelle catastali.
+**Zornade** - L'ecosistema completo per dati territoriali italiani. 83M+ particelle catastali.

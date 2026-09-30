@@ -1,5 +1,5 @@
 """
-Zornade — Plugin QGIS per Particelle Catastali Arricchite.
+Zornade - Plugin QGIS per Particelle Catastali Arricchite.
 
 Scarica particelle catastali italiane arricchite con dati geografici,
 demografici, economici e di rischio tramite le API v2 di Zornade.

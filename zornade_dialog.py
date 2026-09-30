@@ -1,5 +1,5 @@
 """
-Zornade Dialog — Interfaccia Qt6 per ricerca e download particelle.
+Zornade Dialog - Interfaccia Qt6 per ricerca e download particelle.
 
 UI nativa QGIS, ricerca multi-modale (coordinate, bbox, catastale),
 mappa picking, tabella risultati, progress bar, gestione token.
@@ -58,7 +58,7 @@ MAX_CONCURRENCY = 20
 
 
 # ======================================================================
-# Download Task (QgsTask — QGIS best practice)
+# Download Task (QgsTask - QGIS best practice)
 # ======================================================================
 
 class DownloadTask(QgsTask):
@@ -84,7 +84,7 @@ class DownloadTask(QgsTask):
     def __init__(self, description: str, api: ZornadeApiClient,
                  parcel_ids: list,
                  concurrency: int = DEFAULT_CONCURRENCY):
-        super().__init__(description, QgsTask.CanCancel)
+        super().__init__(description, QgsTask.Flag.CanCancel)
         self.api = api
         self.parcel_ids = parcel_ids
         self.concurrency = max(1, min(int(concurrency), MAX_CONCURRENCY))
@@ -189,7 +189,7 @@ class ZornadeDialog(QDialog):
     def __init__(self, iface, parent=None):
         super().__init__(parent or iface.mainWindow())
         self.iface = iface
-        self.setWindowTitle("Zornade — Particelle Catastali")
+        self.setWindowTitle("Zornade - Particelle Catastali")
         self.setMinimumSize(580, 600)
         self.resize(620, 680)
 
@@ -229,7 +229,7 @@ class ZornadeDialog(QDialog):
         link_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         link_btn.setStyleSheet("color: #14b8a6; text-decoration: underline;")
         link_btn.clicked.connect(lambda: QDesktopServices.openUrl(
-            QUrl("https://app.zornade.com/api?ref=qgis-plugin&utm_source=qgis-plugin&utm_medium=desktop")))
+            QUrl("https://app.zornade.com/api?utm_source=qgis-plugin&utm_medium=desktop_app&utm_campaign=qgis_plugin_api")))
         token_header.addWidget(link_btn)
         root.addLayout(token_header)
 
@@ -337,7 +337,7 @@ class ZornadeDialog(QDialog):
         opts_row.addWidget(self.style_combo)
         root.addLayout(opts_row)
 
-        # Zoom alle particelle dopo il download — disattivato di default
+        # Zoom alle particelle dopo il download - disattivato di default
         # per non spostare la vista mappa corrente dell'utente.
         self.chk_zoom_to_layer = QCheckBox(
             "Sposta la vista sulle particelle scaricate")
@@ -366,6 +366,29 @@ class ZornadeDialog(QDialog):
 
         self.status_label = QLabel("")
         root.addWidget(self.status_label)
+
+        # ── License note ──
+        # I dati arrivano dalla API gratuita Zornade v2: l'uso interno e'
+        # libero, la ridistribuzione o rivendita richiede una licenza
+        # commerciale. I link portano ai riferimenti ufficiali del sito.
+        license_label = QLabel(
+            "Licenza: i dati provengono dalla API gratuita Zornade v2 "
+            "(fino a 1.000 richieste/ora). L'uso interno e professionale e' "
+            "libero; ridistribuzione o rivendita richiedono una "
+            "<a href=\"https://zornade.com/licenza-commerciale"
+            "?utm_source=qgis-plugin&utm_medium=desktop_app"
+            "&utm_campaign=qgis_plugin_license_note"
+            "&utm_content=licenza_commerciale\">licenza commerciale</a>. "
+            "Riferimenti: "
+            "<a href=\"https://zornade.com/api-particelle-catastali"
+            "?utm_source=qgis-plugin&utm_medium=desktop_app"
+            "&utm_campaign=qgis_plugin_license_note"
+            "&utm_content=termini_api\">Termini API</a>.")
+        license_label.setWordWrap(True)
+        license_label.setTextFormat(Qt.TextFormat.RichText)
+        license_label.setOpenExternalLinks(True)
+        license_label.setStyleSheet("color: #8a8a92; font-size: 11px;")
+        root.addWidget(license_label)
 
         # ── Bottom buttons ──
         btn_row = QHBoxLayout()
@@ -728,7 +751,7 @@ class ZornadeDialog(QDialog):
         MAX_SIDE = 0.05     # max degrees per side (API constraint)
         TILE_LIMIT = 200    # max results per tile (API cap)
         MIN_SIDE = 0.0005   # minimum tile side (~55m) to avoid infinite recursion
-        MAX_QUERIES = 500   # safety limit (rate limit: 1000 req/hr)
+        MAX_QUERIES = 500   # safety limit (rate limit: 10000 req/hr)
 
         # Build initial tile grid (each tile <= MAX_SIDE)
         dx = x_max - x_min
@@ -1026,7 +1049,7 @@ class ZornadeDialog(QDialog):
             else:
                 self.status_label.setText("Impossibile creare il layer")
                 QgsMessageLog.logMessage(
-                    "Creazione layer fallita — layer non valido",
+                    "Creazione layer fallita - layer non valido",
                     "Zornade", Qgis.MessageLevel.Warning)
         except Exception as exc:
             QgsMessageLog.logMessage(
@@ -1703,7 +1726,7 @@ class ZornadeDialog(QDialog):
                              if feat[f.name()] is not None
                              and str(feat[f.name()]) != "NULL"}
                     QgsMessageLog.logMessage(
-                        f"Feature {i} rejected — geom wkbType={feat.geometry().wkbType()}, "
+                        f"Feature {i} rejected - geom wkbType={feat.geometry().wkbType()}, "
                         f"attrs={attrs}, err={dp.lastError()}",
                         "Zornade", Qgis.MessageLevel.Warning)
         layer.updateExtents()

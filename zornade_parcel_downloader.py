@@ -1,5 +1,5 @@
 """
-Zornade — Plugin QGIS per Particelle Catastali Arricchite.
+Zornade - Plugin QGIS per Particelle Catastali Arricchite.
 
 Plugin class principale: gestisce toolbar, menu e apertura del dialog.
 Usa le API v2 gratuite di Zornade (https://zornade.com).
@@ -31,7 +31,7 @@ class ZornadeParcelDownloader:
         icon = QIcon(icon_path)
         action = QAction(
             icon,
-            self.tr("Zornade — Particelle Catastali"),
+            self.tr("Zornade - Particelle Catastali"),
             self.iface.mainWindow(),
         )
         action.setStatusTip(

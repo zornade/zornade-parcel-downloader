@@ -3,7 +3,7 @@ name=Zornade Particelle Catastali
 qgisMinimumVersion=3.28
 qgisMaximumVersion=4.99
 description=Download enriched Italian cadastral parcels with 110+ attribute fields including terrain, population, buildings, economics, demographics, land cover, land use, OMI valuation and valuation history, coastal erosion, cultural heritage, POI, solar PV potential and nightlights data via the free Zornade API v2.4. Parallel downloads for faster bulk fetching.
-version=3.2.0
+version=3.3.1
 author=Zornade
 email=e.pascatti@gmail.com
 
@@ -14,10 +14,15 @@ repository=https://github.com/menimenocchio/zornade-parcel-downloader
 homepage=https://zornade.com
 
 hasProcessingProvider=no
-changelog=3.2.0 - Parallel downloads, faster bulk fetching, rate-limit handling
+changelog=3.3.1 - License note, scope-aware token check, fixed API link
+    - NEW: license note at the bottom of the dialog: data comes from the free Zornade API v2 (1,000 req/hour), internal and professional use is free, redistribution or resale requires a commercial license; links to the commercial license page and the API terms, both with UTM attribution (qgis-plugin / desktop_app / qgis_plugin_license_note)
+    - FIX: token validation now calls parcels/locate: it verifies the parcels:read scope and real data access, not just authentication (geocode/search returns 200 even without data)
+    - FIX: "Genera token" button link normalized to the standard UTM taxonomy (utm_medium desktop_app, campaign qgis_plugin_api, legacy ref param removed)
+    - FIX: Qt6/QGIS 4 compatibility: QgsTask.CanCancel replaced with QgsTask.Flag.CanCancel (passes the automated Qt6 check on plugins.qgis.org)
+    3.2.0 - Parallel downloads, faster bulk fetching, rate-limit handling
     - NEW: parcels are now downloaded in parallel via a bounded thread pool instead of one at a time; bulk downloads are dramatically faster (e.g. 30 parcels from ~36s to ~3s)
     - NEW: "Richieste in parallelo" spin box to set the concurrency (1–20, default 10, persisted)
-    - FIX: HTTP 429 (rate limit) is now handled gracefully — the download honors the server's Retry-After and retries instead of aborting
+    - FIX: HTTP 429 (rate limit) is now handled gracefully - the download honors the server's Retry-After and retries instead of aborting
     - IMPROVED: 5xx retries and rate-limit waits are now cooperatively cancellable; pressing Cancel stops in-flight workers immediately
     - CHANGED: User-Agent updated to ZornadeQGISPlugin/3.2
     3.1.0 - 3 new data sections, map view no longer moves on download
@@ -70,7 +75,7 @@ changelog=3.2.0 - Parallel downloads, faster bulk fetching, rate-limit handling
     - Download retry logic (3 attempts with exponential backoff on 5xx errors)
     - Clean error messages for server errors (no raw HTML dumps)
     - Default max results raised to 500
-    - Scale-dependent labels: "label — F.foglio" format
+    - Scale-dependent labels: "label - F.foglio" format
     - Removed all deprecated v1 field references
     - Full import cleanup and code audit
     2.0.1 - Multi-point bbox search, QgsTask, English metadata

@@ -1,5 +1,5 @@
 """
-Zornade Sketching — Simbologia QGIS per particelle catastali.
+Zornade Sketching - Simbologia QGIS per particelle catastali.
 
 Applica simbologia con colori Zornade, renderer categorizzati/graduati,
 e labeling scale-dependent.
@@ -31,7 +31,7 @@ ZORNADE_TEAL_DEEPER = "#0f766e"
 ZORNADE_SLATE_900 = "#0f172a"
 
 # ======================================================================
-# CORINE Land Cover — Classi italiane livello 1
+# CORINE Land Cover - Classi italiane livello 1
 # Valori reali restituiti da land_cover.class nell'API v2
 # ======================================================================
 
@@ -45,19 +45,19 @@ LAND_COVER_COLORS = {
 
 # Colori per zona sismica (1 = massimo rischio, 4 = minimo)
 SEISMIC_ZONE_COLORS = [
-    (1, "#DC2626", "Zona 1 — Pericolosità alta"),
-    (2, "#F59E0B", "Zona 2 — Pericolosità media"),
-    (3, "#84CC16", "Zona 3 — Pericolosità bassa"),
-    (4, "#22C55E", "Zona 4 — Pericolosità molto bassa"),
+    (1, "#DC2626", "Zona 1 - Pericolosità alta"),
+    (2, "#F59E0B", "Zona 2 - Pericolosità media"),
+    (3, "#84CC16", "Zona 3 - Pericolosità bassa"),
+    (4, "#22C55E", "Zona 4 - Pericolosità molto bassa"),
 ]
 
 # Colori per classe rischio subsidenza (1-5)
 SUBSIDENCE_RISK_COLORS = [
-    (1, "#22C55E", "1 — Trascurabile"),
-    (2, "#84CC16", "2 — Basso"),
-    (3, "#F59E0B", "3 — Medio"),
-    (4, "#EF4444", "4 — Alto"),
-    (5, "#991B1B", "5 — Molto alto"),
+    (1, "#22C55E", "1 - Trascurabile"),
+    (2, "#84CC16", "2 - Basso"),
+    (3, "#F59E0B", "3 - Medio"),
+    (4, "#EF4444", "4 - Alto"),
+    (5, "#991B1B", "5 - Molto alto"),
 ]
 
 
@@ -148,7 +148,7 @@ def create_parcel_labeling() -> QgsVectorLayerSimpleLabeling:
     settings.fieldName = (
         "CASE "
         "WHEN \"foglio\" IS NOT NULL "
-        "THEN \"label\" || ' — F.' || \"foglio\" "
+        "THEN \"label\" || ' - F.' || \"foglio\" "
         "ELSE coalesce(\"label\", to_string(\"parcel_id\")) "
         "END"
     )
