@@ -232,7 +232,8 @@ Cerca particelle per riferimento catastale (comune, foglio, particella).
     {
       "fid": 28007896,
       "label": "1",
-      "municipality": "Roma",
+      "municipality": { "code": "H501", "name": "Roma", "province": "Roma", "region": "Lazio" },
+      "municipality_name": "Roma",
       "foglio": "481",
       "sezione": "A",
       "area_m2": 149.28,
@@ -595,9 +596,9 @@ Stima della popolazione residente sulla particella:
 | Campo | Tipo | Descrizione |
 |---|---|---|
 | `estimated` | float\|null | Popolazione stimata (valore finale migliore) |
-| `sum` | float\|null | Somma dei pixel WorldPop intersecanti |
-| `pixel_count` | integer\|null | Numero pixel WorldPop intersecanti |
-| `mean` | float\|null | Media dei pixel WorldPop |
+| `sum` | float\|null | Somma dei pixel del raster intersecanti |
+| `pixel_count` | integer\|null | Numero di pixel del raster intersecanti |
+| `mean` | float\|null | Media dei pixel del raster |
 | `dasymetric` | float\|null | Stima dasymetrica (basata su edifici residenziali) |
 | `estimation_method` | string\|null | Metodo di stima (es. `worldpop_constrained`, `dasymetric`, `legacy`) |
 | `estimation_confidence` | float\|null | Confidenza della stima (0–1) |
@@ -857,9 +858,39 @@ Quando `available` è `true`:
 
 Ogni elemento di `buildings` contiene: `building_fid`, `roof_shape`, `roof_pitch_deg`, `roof_aspect_deg`, `roof_area_real_m2`, `kwp_max`, `pvout_modern_kwh_year`, `capex_eur`, `npv_20y_eur`, `payback_years_simple`, `lcoe_eur_per_kwh`, `viability_class`, `confidence_level`, `exclusion_reason`, `bipv_eligible`.
 
-### 8.19 `nightlights`
+### 8.19 `nightlights` (deprecata) e `nightlights_v2`
 
-Luminosità notturna derivata dalle immagini satellitari VIIRS Black Marble (VNP46A4).
+Luminosità notturna dalle immagini satellitari VIIRS Black Marble (VNP46A4).
+
+**`nightlights_v2` è la sezione da usare.** Il raster viene campionato nel punto del centroide della
+particella: nessuna disaggregazione. Si chiede con `?include=nightlights_v2` e **non** arriva con
+`include=all`, perché il riempimento è progressivo per comune. Se la particella non è ancora stata
+elaborata l'oggetto è `{ "available": false, "method": "per_parcel_sampling" }`.
+
+| Campo | Tipo | Descrizione |
+|---|---|---|
+| `available` | boolean | `true` se la particella è già stata elaborata |
+| `method` | string | Sempre `per_parcel_sampling` |
+| `ntl_method_version` | integer | Generazione del metodo: `2` = campionamento per particella |
+| `ntl_pixel` | float | Radianza del pixel VIIRS che contiene la particella (nW/cm²/sr). **È la misura.** |
+| `ntl_local_mean` | float | Media della finestra di `ntl_window_px` pixel (~1,4 km² a 3 px), solo terra e costa |
+| `ntl_local_max` | float | Massimo nella stessa finestra |
+| `ntl_distance_to_light_m` | float | Metri dal pixel acceso più vicino. L'unico campo a scala di particella |
+| `ntl_observations` | integer | Osservazioni satellitari dietro il valore del pixel (mediana in Italia: 53) |
+| `ntl_quality_flag` | integer | `0` buona, `1` scarsa, `2` riempita con dati storici |
+| `ntl_class` | string | `dark` (<0,5) · `dim` (0,5–2) · `medium` (2–5) · `bright` (5–10) · `very_bright` (≥10 nW/cm²/sr) |
+| `ntl_status` | string | `ok`, `no_data`, `outside_raster` |
+| `ntl_window_px` | integer | Lato della finestra usata per i campi locali |
+| `ntl_year` | integer | Anno dei dati (es. `2023`) |
+| `source` | string | Fonte (es. `viirs_vnp46a4_c2_2023`) |
+| `updated_at` | string | Timestamp ISO 8601 |
+
+**`nightlights` (versione precedente): deprecata dal 2026-10-12, rimozione il 2027-04-12.** Resta
+servita identica fino a quella data e le risposte che la chiedono esplicitamente includono gli header
+`Deprecation` e `Sunset`. I suoi campi `ntl_share`, `ntl_mean_comune` ed `estimation_method`
+descrivono la disaggregazione comunale, che non esiste più, e non hanno un equivalente in
+`nightlights_v2`. Nei dati serviti la scala di `ntl_class` è quella con cui il dataset è stato
+costruito (aprile 2026): `dim` 0,5–3, `medium` 3–10, `bright` 10–30, `very_bright` ≥30.
 
 Se non disponibile, l'oggetto è `{ "available": false }`.
 
@@ -868,7 +899,7 @@ Quando `available` è `true`:
 | Campo | Tipo | Descrizione |
 |---|---|---|
 | `available` | boolean | `true` se sono disponibili dati di luminosità |
-| `ntl_parcel` | float | Radianza notturna stimata sulla particella |
+| `ntl_parcel` | float | Radianza notturna stimata sulla particella (media comunale distribuita sul footprint OSM, limite 200) |
 | `ntl_density` | float | Densità di radianza (per unità di superficie) |
 | `ntl_class` | string | Classe di luminosità: `dark`, `dim`, `medium`, `bright`, `very_bright` |
 | `ntl_share` | float | Quota della radianza comunale attribuita alla particella |
@@ -877,12 +908,20 @@ Quando `available` è `true`:
 | `ntl_year` | integer | Anno dei dati (es. `2023`) |
 | `source` | string | Fonte (es. `viirs_vnp46a4_c2_2023`) |
 | `updated_at` | string | Timestamp ISO 8601 dell'ultimo aggiornamento |
+| `deprecated` | boolean | Sempre `true` in questa versione della sezione |
+| `deprecation` | object | `announced`, `sunset`, `replaced_by`, `reason` |
 
 ### 8.20 `valuation_history`
 
 Serie storica semestrale delle quotazioni immobiliari OMI (Osservatorio del Mercato Immobiliare) per la zona della particella. Tipo immobiliare di riferimento: `Abitazioni civili`, stato `NORMALE`.
 
-`null` se la particella non è arricchita con lo storico OMI.
+La serie **segue la particella**: per ogni semestre la zona OMI è risolta sulla geometria di **quel** semestre (`omi_zones_geom_historical`), quindi se la particella è passata da una zona a un'altra la serie lo mostra invece di proiettare all'indietro la zona di oggi. Roma Colosseo: `zone` `R41` fino al 2021/2, `B3` dal 2022/1. L'ultimo punto coincide con la riga OMI del blocco `valuation` di questa stessa risposta, perché la zona corrente gli viene passata esplicitamente.
+
+`semesters[].purchase` è `null` dove la zona di quel semestre non ha quotazioni pubblicate: capita nelle zone rurali, che sono il 32,7% delle zone `R`. `semesters[].zone` è `null` quando i poligoni di quel semestre non sono disponibili nell'archivio (comuni nati da fusioni recenti hanno storia solo dal loro anno di nascita; per i comuni il cui territorio apparteneva ad altri la zona viene recuperata da quelli).
+
+Se la zona non si risolve (particella senza comune o senza geometria utilizzabile) si ripiega sulla tabella pre-calcolata **per particella** (`parcel_omi_history`). Il campo `series_origin` dichiara quale delle due ha risposto.
+
+`null` se nessuna delle due sorgenti ha una serie per la particella.
 
 | Campo | Tipo | Descrizione |
 |---|---|---|
@@ -891,11 +930,12 @@ Serie storica semestrale delle quotazioni immobiliari OMI (Osservatorio del Merc
 | `property_type` | string | Tipo immobiliare (es. `Abitazioni civili`) |
 | `condition` | string | Stato conservativo (es. `NORMALE`) |
 | `semesters` | array | Serie storica semestrale (vedi sotto) |
-| `metrics` | object\|null | Metriche aggregate calcolate (può essere `null`) |
-| `annotations` | object\|null | Annotazioni (può essere `null`) |
-| `data_version` | string | Versione del dataset (es. `omi_2015_1..2025_2_v1`) |
-| `source` | string | Fonte (es. `omi_historical_enrichment`) |
-| `updated_at` | string | Timestamp ISO 8601 dell'ultimo aggiornamento |
+| `metrics` | object\|null | Metriche aggregate calcolate: presenti solo quando risponde la tabella per particella |
+| `annotations` | object\|null | Annotazioni editoriali sui cambi di zona: presenti solo con la tabella per particella |
+| `data_version` | string | Versione del dataset (es. `omi_historical 2015_1..2025_2`) |
+| `source` | string | Fonte (es. `omi_historical`) |
+| `series_origin` | string | Sorgente che ha risposto: `omi_zone_facts` (zona) oppure `parcel_omi_history` (per particella) |
+| `updated_at` | string\|null | Timestamp ISO 8601 dell'ultimo aggiornamento (solo con la tabella per particella) |
 
 Ogni elemento di `semesters`:
 
@@ -924,7 +964,7 @@ Ogni elemento di `semesters`:
 | Frane | ISPRA - Inventario fenomeni franosi | CC BY 4.0 | 2024 |
 | Subsidenza | EGMS - European Ground Motion Service | Copernicus data policy | 2023 |
 | Terreno | TINItaly/01 DEM (10m) - INGV | CC BY 4.0 | v1.1 |
-| Popolazione | WorldPop + dasymetry | CC BY 4.0 | 2020–2023 |
+| Popolazione | HRSL (Meta/CIESIN) + WorldPop | CC BY 4.0 | 2020–2025 |
 | Edifici | OpenStreetMap | ODbL 1.0 | Continuo |
 | Redditi/Economia | MEF - Dipartimento delle Finanze (IRPEF) | Dati aperti MEF | 2023 |
 | Dati demografici | ISTAT - Censimento permanente 2021 | CC BY 3.0 IT | 2021 |

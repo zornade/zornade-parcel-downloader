@@ -4,12 +4,22 @@ All notable changes to the Zornade - Cadastral Parcels QGIS plugin.
 The same changelog (recent versions) is published in `metadata.txt` and shown by
 the QGIS Plugin Manager.
 
+## 3.3.2 - 2026-10-14
+
+Corrected the free API rate limit in the plugin description and licence note.
+
+- **FIX**: the licence note and the plugin description stated a 1,000 req/hour
+  limit. The free Zornade API v2 allows **10,000 requests/hour per token**
+  (sliding one-hour window), so the published limit was understated by 10x.
+- **FIX**: completed the population source list in the plugin description
+  (HRSL Meta/CIESIN + WorldPop/dasymetric).
+
 ## 3.3.1 - 2026-09-30
 
 License note, scope-aware token check, fixed API link.
 
 - **NEW**: license note at the bottom of the dialog, always visible. Explains
-  that data comes from the free Zornade API v2 (up to 1,000 requests/hour), that
+  that data comes from the free Zornade API v2 (up to 10,000 requests/hour), that
   internal and professional use is free, and that redistribution or resale
   requires a commercial license. Two links: commercial license page and API
   terms, both with UTM attribution (`qgis-plugin / desktop_app / qgis_plugin_license_note`).

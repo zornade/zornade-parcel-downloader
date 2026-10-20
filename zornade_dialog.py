@@ -373,7 +373,7 @@ class ZornadeDialog(QDialog):
         # commerciale. I link portano ai riferimenti ufficiali del sito.
         license_label = QLabel(
             "Licenza: i dati provengono dalla API gratuita Zornade v2 "
-            "(fino a 1.000 richieste/ora). L'uso interno e professionale e' "
+            "(fino a 10.000 richieste/ora). L'uso interno e professionale e' "
             "libero; ridistribuzione o rivendita richiedono una "
             "<a href=\"https://zornade.com/licenza-commerciale"
             "?utm_source=qgis-plugin&utm_medium=desktop_app"
