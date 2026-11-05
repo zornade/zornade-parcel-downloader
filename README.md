@@ -112,6 +112,9 @@ Documentazione completa: [zornade.com/api-particelle-catastali](https://zornade.
 
 GPL-2.0-or-later - [LICENSE](LICENSE)
 
+Copyright (C) 2024-2026 Zornade. Il testo integrale della licenza e' nel file
+LICENSE, senza modifiche, come richiesto dai termini stessi della GPL.
+
 ## Changelog
 
 Tutte le modifiche per versione: [CHANGELOG.md](CHANGELOG.md). Lo stesso
