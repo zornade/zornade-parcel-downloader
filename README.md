@@ -1,132 +1,116 @@
-# Zornade - Particelle Catastali per QGIS
+# Zornade Particelle Catastali per QGIS
 
-Plugin QGIS professionale per scaricare **particelle catastali italiane arricchite** tramite le [API v2 gratuite di Zornade](https://zornade.com/api-particelle-catastali).
+[![QGIS](https://img.shields.io/badge/QGIS-3.28%2B-3b9c3b)](https://plugins.qgis.org/plugins/zornade_parcel_downloader/)
+[![Plugin](https://img.shields.io/badge/Plugin%20ID-3930-blue)](https://plugins.qgis.org/plugins/zornade_parcel_downloader/)
+[![Licenza](https://img.shields.io/badge/Licenza-GPL--2.0--or--later-lightgrey)](LICENSE)
 
-![Zornade](icon.png)
+Scarica le particelle catastali italiane già arricchite: rischio sismico,
+idrogeologico e di subsidenza, quotazioni OMI, uso del suolo, demografia,
+redditi, potenziale fotovoltaico. Funziona per coordinate, per indirizzo, per
+vista mappa o per riferimento catastale, e restituisce un layer pronto da
+simbolizzare.
 
-## Funzionalità
+Serve a geometri, uffici tecnici, studi che fanno due diligence immobiliare, e a
+chiunque debba mettere su una mappa un'area senza passare dal portale
+dell'Agenzia delle Entrate.
 
-- **Ricerca multi-modale**: per coordinate GPS, indirizzo (geocoding integrato), vista mappa (bbox adattivo con quadtree), o riferimento catastale (codice Belfiore + foglio + particella)
-- **Map picking**: clicca direttamente sulla mappa per selezionare il punto di ricerca
-- **Dati arricchiti per ogni particella** (35 campi):
-  - Geometria accurata (Polygon/MultiPolygon)
-  - Uso suolo CORINE Land Cover (codice, classe, sottoclasse, descrizione)
-  - Dati catastali (foglio, sezione urbana, CAP, indirizzo)
-  - Rischio sismico (zona 1–4, PGA), alluvione e frana
-  - Subsidenza (velocità mm/anno, classe di rischio, direzione)
-  - Valutazione immobiliare OMI (prezzo acquisto e affitto min/max €/m²)
-- **Simbologia professionale**: renderer categorizzato per uso suolo CORINE (5 classi L1), zona sismica (4 classi), subsidenza (5 classi)
-- **Download asincrono**: QgsTask con progress bar, retry automatico su errori server
-- **Interfaccia Qt6**: branding Zornade, UX pulita e intuitiva
-
-## Requisiti
-
-- **QGIS** 3.28+
-- **Token API Zornade** (gratuito) - generalo su [app.zornade.com](https://app.zornade.com)
+Il plugin è nel repository ufficiale di QGIS (ID 3930), con oltre 4.300 download
+a novembre 2026.
 
 ## Installazione
 
-### Da ZIP
+**Dal Plugin Manager di QGIS**, che è la via normale.
 
-1. Scarica l'ultima release `.zip` da [GitHub Releases](https://github.com/menimenocchio/zornade-parcel-downloader/releases)
-2. In QGIS: **Plugin → Gestisci e Installa Plugin → Installa da ZIP**
-3. Seleziona il file `.zip` scaricato
+1. QGIS → **Plugin → Gestisci e installa plugin**
+2. Cerca `Zornade`
+3. **Installa plugin**
+4. L'icona compare nella toolbar, e la voce in **Web → Zornade → Particelle Catastali**
 
-### Da sorgente
+Installazione da file ZIP, per una versione non ancora pubblicata:
+
+1. Scarica l'ultima release da [GitHub Releases](https://github.com/zornade/zornade-parcel-downloader/releases)
+2. QGIS → **Plugin → Gestisci e installa plugin → Installa da ZIP**
+3. Seleziona il file scaricato
+
+Da sorgente, per chi sviluppa:
 
 ```bash
-git clone https://github.com/menimenocchio/zornade-parcel-downloader.git
+git clone https://github.com/zornade/zornade-parcel-downloader.git
 cd zornade-parcel-downloader
 make deploy
 ```
 
-## Guida Rapida
+## Token gratuito
 
-1. **Ottieni un token**: registrati su [app.zornade.com](https://app.zornade.com) e genera un token API con scope `parcels:read` e `geocoding:read`
-2. **Apri il plugin**: clicca sull'icona Zornade nella toolbar o vai su **Web → Zornade → Particelle Catastali**
-3. **Inserisci il token**: incolla il token nel campo dedicato e clicca "Salva"
-4. **Cerca**: scegli il metodo di ricerca (coordinate, indirizzo, o catastale) e clicca "Cerca Particelle"
-5. **Seleziona e scarica**: spunta le particelle desiderate e clicca "Scarica Selezionate"
-6. Il layer viene creato automaticamente con simbologia Zornade
+Il plugin interroga le API Zornade, che sono gratuite con 10.000 richieste
+all'ora per token.
 
-## Simbologia Disponibile
+1. Registrati su [app.zornade.com](https://app.zornade.com)
+2. Genera un token con gli scope `parcels:read` e `geocoding:read`
+3. Incolla il token nel campo del plugin e premi **Salva**
 
-| Modalità | Campo | Descrizione |
+## Come si cerca
+
+| Modalità | Come | Quando serve |
 |---|---|---|
-| **Uso Suolo (CORINE)** | `land_cover_class` | 5 classi Level 1: Superfici artificiali, agricole, boscate, zone umide, corpi idrici |
-| **Zona Sismica** | `seismic_zone` | Zone 1–4 (1 = rischio massimo, 4 = minimo) |
-| **Rischio Subsidenza** | `subsidence_risk_class` | Classi 1–5 con scala cromatica graduata |
+| Coordinate | latitudine e longitudine, o clic sulla mappa | quando le coordinate sono note |
+| Indirizzo | geocoding integrato | quando si parte da una via e un civico |
+| Vista mappa | riquadro corrente, suddiviso con un quadtree adattivo | per un'area intera |
+| Riferimento catastale | comune (ricerca fuzzy), foglio, particella, sezione | quando si ha la visura in mano |
 
-## Attributi Particella
+## Cosa arriva con ogni particella
 
-| Campo | Tipo | Descrizione |
+Ogni particella porta **oltre 110 campi, in 20 sezioni**. Questi sono i gruppi
+principali.
+
+| Gruppo | Cosa contiene |
+|---|---|
+| Geometria e identificativi | poligono o multipoligono, foglio, particella, sezione urbana, `gml_id`, riferimento catastale, comune, provincia, regione, area in m² |
+| Rischio | zona sismica da 1 a 4 e PGA, pericolosità alluvioni e frane ISPRA, subsidenza con velocità, accelerazione, classe e direzione |
+| Valutazione | quotazioni OMI di acquisto e affitto min/max in €/m², semestre precedente, serie storica dal 2015 al 2025 con rendimento lordo |
+| Territorio | quota, pendenza, esposizione, rugosità, uso del suolo CORINE, Urban Atlas, erosione costiera, beni culturali |
+| Popolazione e edifici | stime HRSL e WorldPop, censimento 2021 per età, istruzione, occupazione, stranieri, famiglie, abitazioni |
+| Economia | reddito medio, indice di Gini, indice di accessibilità PIR, fasce di reddito |
+| Fotovoltaico | potenza installabile, resa annua, tempo di ritorno, VAN, LCOE, classe di convenienza (JRC PVGIS-SARAH3) |
+| Luce notturna | radianza e classe VIIRS Black Marble |
+
+L'elenco completo dei campi, sezione per sezione, è nella documentazione delle
+API: [zornade.com/api-particelle-catastali](https://zornade.com/api-particelle-catastali).
+
+## Simbologia inclusa
+
+| Simbologia | Campo | Classi |
 |---|---|---|
-| `fid` | Integer | ID univoco particella |
-| `gml_id` | String | Identificativo GML |
-| `label` | String | Etichetta catastale |
-| `cadastral_reference` | String | Riferimento catastale completo |
-| `municipality` | String | Nome comune |
-| `municipality_code` | String | Codice comune (Belfiore) |
-| `province` | String | Provincia |
-| `region` | String | Regione |
-| `area_m2` | Double | Superficie in m² |
-| `centroid_lat` | Double | Latitudine centroide |
-| `centroid_lng` | Double | Longitudine centroide |
-| `foglio` | String | Foglio catastale |
-| `sezione_urbana` | String | Sezione urbana |
-| `postal_code` | String | CAP |
-| `address` | String | Indirizzo |
-| `seismic_zone` | Integer | Zona sismica (1–4) |
-| `pga` | Double | Accelerazione di picco al suolo |
-| `flood_level` | String | Livello rischio alluvione |
-| `landslide_level` | String | Livello rischio frana |
-| `subsidence_velocity` | Double | Velocità subsidenza (mm/anno) |
-| `subsidence_risk_class` | Integer | Classe rischio subsidenza (1–5) |
-| `subsidence_risk_label` | String | Etichetta rischio subsidenza |
-| `subsidence_direction` | String | Direzione subsidenza |
-| `land_cover_code` | String | Codice CORINE uso suolo |
-| `land_cover_class` | String | Classe CORINE Level 1 |
-| `land_cover_subclass` | String | Sottoclasse uso suolo |
-| `land_cover_desc` | String | Descrizione uso suolo |
-| `val_zone` | String | Zona OMI |
-| `val_zone_desc` | String | Descrizione zona OMI |
-| `val_property_type` | String | Tipo immobile |
-| `val_purchase_min` | Double | Prezzo acquisto minimo (€/m²) |
-| `val_purchase_max` | Double | Prezzo acquisto massimo (€/m²) |
-| `val_rental_min` | Double | Affitto minimo (€/m²) |
-| `val_rental_max` | Double | Affitto massimo (€/m²) |
+| Uso del suolo CORINE | `land_cover_class` | 5 classi di primo livello |
+| Zona sismica | `seismic_zone` | 4 classi |
+| Rischio subsidenza | `subsidence_risk_class` | 5 classi |
 
-## API Zornade v2
+## Costi e licenze
 
-Le API sono **100% gratuite** con 10.000 richieste/ora. Endpoint utilizzati:
+**Il dato è gratuito.** Consultare, analizzare e stampare non costa nulla: 10.000
+richieste all'ora per token, cinque token per utente. Sul piano gratuito resta
+visibile l'attribuzione «Dati elaborati da Zornade».
 
-- `GET /api/v2/parcels/locate` - Localizza particelle per coordinate
-- `GET /api/v2/parcels/search` - Cerca per riferimento catastale
-- `GET /api/v2/parcels/{id}` - Profilo arricchito particella
-- `GET /api/v2/geocode/search` - Geocoding diretto
-- `GET /api/v2/geocode/reverse` - Geocoding inverso
+**La ridistribuzione no.** Chi rivende il dato o lo integra in un prodotto
+proprio ha bisogno della [licenza commerciale](https://zornade.com/licenza-commerciale).
+Le attribuzioni delle fonti (Agenzia delle Entrate, ISPRA, INGV, ISTAT,
+OpenStreetMap) restano obbligatorie in ogni caso.
 
-Documentazione completa: [zornade.com/api-particelle-catastali](https://zornade.com/api-particelle-catastali)
-
-## Licenza
-
-GPL-2.0-or-later - [LICENSE](LICENSE)
-
-Copyright (C) 2024-2026 Zornade. Il testo integrale della licenza e' nel file
+**Il codice del plugin** è GPL-2.0-or-later, vedi [LICENSE](LICENSE).
+Copyright (C) 2024-2026 Zornade. Il testo integrale della licenza è nel file
 LICENSE, senza modifiche, come richiesto dai termini stessi della GPL.
 
-## Changelog
+## Link
 
-Tutte le modifiche per versione: [CHANGELOG.md](CHANGELOG.md). Lo stesso
-changelog è mostrato dal Plugin Manager di QGIS (campo `changelog` in
-`metadata.txt`).
+- Scheda nel repository QGIS, con il pulsante di installazione: [plugins.qgis.org/plugins/zornade_parcel_downloader](https://plugins.qgis.org/plugins/zornade_parcel_downloader/)
+- Documentazione delle API: [zornade.com/documentation](https://zornade.com/documentation)
+- Modifiche per versione: [CHANGELOG.md](CHANGELOG.md). Lo stesso elenco lo mostra il Plugin Manager alla prima apertura dopo un aggiornamento.
+- Problemi e richieste: [GitHub Issues](https://github.com/zornade/zornade-parcel-downloader/issues)
+- Dataset aperti scaricabili: [zornade.com/data-downloads](https://zornade.com/data-downloads)
 
-## Supporto
+## Endpoint usati
 
-- **Issues**: [GitHub Issues](https://github.com/menimenocchio/zornade-parcel-downloader/issues)
-- **Documentazione API**: [zornade.com/documentation](https://zornade.com/documentation)
-- **Contatti**: [zornade.com/servizi-sviluppo-software#contact](https://zornade.com/servizi-sviluppo-software#contact)
-
----
-
-**Zornade** - L'ecosistema completo per dati territoriali italiani. 83M+ particelle catastali.
+- `GET /api/v2/parcels/locate` per coordinate o riquadro
+- `GET /api/v2/parcels/search` per riferimento catastale
+- `GET /api/v2/parcels/{id}` per il profilo arricchito
+- `GET /api/v2/geocode/search` e `GET /api/v2/geocode/reverse` per il geocoding
